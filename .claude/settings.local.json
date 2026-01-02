@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git remote add origin:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(ping:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(ssh-keygen:*)",
+      "Bash(ssh-add:*)",
+      "Bash(ssh:*)",
+      "Bash(git rm:*)",
+      "Bash(GIT_TRACE=1 GIT_SSH_COMMAND=\"ssh -v\" git push:*)"
+    ]
+  }
+}

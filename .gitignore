@@ -1,0 +1,36 @@
+# 附件材料
+本科生附件/
+本科生必备材料/
+注意：应提交DOC文档。附件3、 北京师范大学本科生毕业论文（设计）开题报告.doc
+
+# 开题报告相关（仅保留王晓阳的）
+*+贺钰雯+*
+湾区国际商学院毕业论文开题报告评分表（王晓阳）.docx
+
+# CFPS数据文件（保留说明文档）
+CFPS/*.zip
+CFPS/*.rar
+CFPS/*.dta
+CFPS/*.docx
+CFPS/*Stata*/
+
+# Office文档缓存
+~$*.doc*
+~$*.ppt*
+*.tmp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.log
+*.cache
