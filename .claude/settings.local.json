@@ -14,7 +14,9 @@
       "Bash(ssh-add:*)",
       "Bash(ssh:*)",
       "Bash(git rm:*)",
-      "Bash(GIT_TRACE=1 GIT_SSH_COMMAND=\"ssh -v\" git push:*)"
+      "Bash(GIT_TRACE=1 GIT_SSH_COMMAND=\"ssh -v\" git push:*)",
+      "Bash(ls:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
