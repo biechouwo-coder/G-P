@@ -16,7 +16,14 @@
       "Bash(git rm:*)",
       "Bash(GIT_TRACE=1 GIT_SSH_COMMAND=\"ssh -v\" git push:*)",
       "Bash(ls:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(where:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(py:*)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(move *.py py代码文件)"
     ]
   }
 }

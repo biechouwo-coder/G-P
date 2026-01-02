@@ -16,10 +16,11 @@ This is an undergraduate thesis project studying the impact of low-carbon city p
 
 The project integrates four primary datasets:
 
-1. **Industrial Structure Data** (`原始数据/2000-2023地级市产业结构 - 面板.xls`)
+1. **Industrial Structure Data** (`原始数据/2000-2023地级市产业结构 .xlsx`)
    - 330 prefecture-level cities, 2000-2023
    - Contains GDP, three-sector value-added, industrial structure metrics
    - Core outcome variables: industrial upgrading indices
+   - Status: Ready to merge (file is .xlsx format, readable by pandas)
 
 2. **Population Density Data** (`原始数据/298个地级市人口密度1998-2024年无缺失.xlsx`)
    - 298 cities, 1998-2024, no missing values (interpolated)
@@ -165,11 +166,88 @@ Key citations (see `中文参考/` and `英文参考/`):
 - Cao Xiang - Low-carbon pilots & green lifestyle formation
 - Zhao Zhenzhi - Low-carbon strategy & total factor productivity
 
+## Current Data Processing Status
+
+As of January 2, 2025:
+
+**Completed:**
+- ✅ Literature review & theoretical analysis
+- ✅ Data collection & compilation
+- ✅ Proposal completed
+- ✅ Partial data merge (GDP, population density, carbon emissions → 8,065 obs, 7 variables)
+- ✅ Time period filtering (2007-2023 subset created → 5,066 obs)
+
+**In Progress:**
+- ⏳ Industrial structure data merge (file exists as .xlsx but needs to be integrated)
+
+**Pending:**
+- ⏳ Full data merge completion
+- ⏳ Construct treatment variable (DID: pilot city × post-policy period)
+- ⏳ Empirical model estimation
+- ⏳ Robustness testing
+- ⏳ Thesis writing
+
+## Data Processing Commands
+
+### Python Environment
+```bash
+# Activate Python environment
+py --version  # Should be 3.8.1
+
+# Install required packages (if needed)
+py -m pip install pandas openpyxl
+
+# Run data merge scripts
+cd c:\Users\HP\Desktop\毕业论文
+py merge_final.py  # Merge 3 datasets (already done)
+py filter_2007_2023.py  # Filter to 2007-2023 period
+```
+
+### Current Data Files
+- `总数据集.xlsx` - Merged dataset (8,065 rows × 7 columns, 1998-2024)
+- `总数据集_2007-2023.xlsx` - Time-filtered dataset (5,066 rows × 7 columns)
+- `原始数据/2000-2023地级市产业结构 .xlsx` - Industrial structure data (ready to merge)
+
+### Data Merge Process
+The merge uses pandas with city_name + year as matching keys:
+
+```python
+# Standard approach used in merge_final.py
+import pandas as pd
+
+df_pop = pd.read_excel('原始数据/298个地级市人口密度1998-2024年无缺失.xlsx')
+df_gdp = pd.read_excel('原始数据/296个地级市GDP相关数据（以2000年为基期）.xlsx')
+df_carbon = pd.read_excel('原始数据/地级市碳排放强度.xlsx')
+
+# Extract columns by position (not name) to avoid encoding issues
+df_pop = df_pop.iloc[:, [0, 2, 4, 8]]  # year, city_name, city_code, pop_density
+df_pop.columns = ['year', 'city_name', 'city_code', 'pop_density']
+
+df_gdp = df_gdp.iloc[:, [1, 2, 5, 6]]  # city_name, year, gdp_real, gdp_deflator
+df_gdp.columns = ['city_name', 'year', 'gdp_real', 'gdp_deflator']
+
+df_carbon = df_carbon.iloc[:, [0, 1, 3, 8]]  # year, city_code, city_name, carbon_intensity
+df_carbon.columns = ['year', 'city_code', 'city_name', 'carbon_intensity']
+
+# Outer merge on city_name + year
+df_merged = pd.merge(df_pop, df_gdp, on=['city_name', 'year'], how='outer')
+df_merged = pd.merge(df_merged, df_carbon, on=['city_name', 'year'], how='outer')
+
+# Save
+df_merged.to_excel('总数据集.xlsx', index=False, engine='openpyxl')
+```
+
+**Critical Notes:**
+- Column positions (indices) are used instead of names due to Chinese character encoding issues
+- City name matching is used instead of city_code due to inconsistent city_code availability
+- Industrial structure data file exists but needs to be merged into the main dataset
+
 ## Research Status
 
 - ✅ Literature review & theoretical analysis
 - ✅ Data collection & compilation
 - ✅ Proposal completed
+- ⏳ Full data merge (3 of 4 sources merged, industrial structure pending)
 - ⏳ Empirical model construction
 - ⏳ Data analysis & results
 - ⏳ Thesis writing
