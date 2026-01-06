@@ -12,17 +12,18 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 **Repository:** https://github.com/biechouwo-coder/G-P.git
 
-## Current Status (January 2, 2025)
+## Current Status (January 6, 2025)
 
 ### Completed Work
-- ✅ Data collection: 4 datasets merged (population density, GDP, carbon emissions, industrial structure)
+- ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area)
 - ✅ Data cleaning: Removed outliers, handled missing values, ensured data quality
-- ✅ Final dataset: `总数据集_2007-2023_最终版.xlsx` (3,672 obs × 216 cities × 11 variables, 100% complete)
-- ✅ Descriptive statistics: `描述性统计表_最终版.xlsx`
+- ✅ DID variable construction: Three-batch pilot policy (2010, 2012, 2017) implemented
+- ✅ FDI processing: Added FDI openness ratio (fdi_rmb/gdp_nominal) with year-specific exchange rates
+- ✅ Road area: Added prefecture-level road area variable (ln_road_area)
+- ✅ Final dataset: `总数据集_2007-2023_完整版.xlsx` (3,672 obs × 216 cities × 19 variables, 100% complete)
 - ✅ Documentation: Complete data cleaning log in `数据清理计划.md`
 
 ### Next Steps
-- [ ] Construct DID policy variable (Treat × Post for three pilot batches)
 - [ ] Baseline DID regression with city and year fixed effects
 - [ ] Robustness testing (parallel trends, PSM-DID, placebo tests)
 - [ ] Heterogeneity analysis
@@ -65,11 +66,11 @@ git push
 ## Research Data Architecture
 
 ### Final Dataset
-**File:** `总数据集_2007-2023_最终版.xlsx`
+**File:** `总数据集_2007-2023_完整版.xlsx`
 - **Observations:** 3,672 city-year pairs
 - **Cities:** 216 prefecture-level cities
 - **Years:** 2007-2023 (17 years)
-- **Variables:** 11 (100% complete, no missing values)
+- **Variables:** 19 (100% complete, no missing values)
 
 **Quality Checks:**
 - ✅ GDP deflator minimum: 0.8410 (>0.8, indicating consistent base year)
@@ -91,6 +92,14 @@ git push
 | `carbon_intensity` | **Dependent Variable** | CO₂ per unit GDP | 吨/亿元（2000年基期） | Primary outcome |
 | `tertiary_share` | Control | Tertiary industry share | 比例 | Industrial structure |
 | `industrial_upgrading` | Alternative Outcome | Tertiary/Secondary ratio | 比例 | Industrial upgrading measure |
+| `did` | **Policy Variable** | DID policy variable | - | Treat × Post (multi-period) |
+| `treat` | Policy | Treatment group indicator | - | 1 if pilot city, 0 otherwise |
+| `post` | Policy | Post-policy period indicator | - | 1 if year ≥ pilot_year |
+| `pilot_year` | Policy | Pilot implementation year | - | 2010, 2012, or 2017 |
+| `fdi` | Control | Foreign direct investment | 百万美元 | Original FDI data |
+| `fdi_openness` | Control | FDI/GDP ratio | 比例 | Uses nominal GDP + year-specific exchange rates |
+| `road_area` | Control | Road area per capita | 平方米/人 | Prefecture-level data |
+| `ln_road_area` | Control | Log road area per capita | - | ln(road_area + 1) |
 
 ### Data Merge Strategy
 
@@ -145,27 +154,37 @@ Where:
 - `νₜ`: Year fixed effects (controls common temporal shocks)
 - `ε_it`: Error term clustered at city level
 
-### DID Variable Construction (PENDING)
+### DID Variable Construction (COMPLETED)
+
+**Implementation:** See [py代码文件/construct_did_variable.py](py代码文件/construct_did_variable.py)
 
 **Three Pilot Batches:**
-- Batch 1 (2010): 5 provinces + 8 cities (Treat=1, Post=1 from 2010)
-- Batch 2 (2012): 26 cities (Treat=1, Post=1 from 2012)
-- Batch 3 (2017): 45 cities (Treat=1, Post=1 from 2017)
+- Batch 1 (2010): 5 provinces + 8 cities
+  - Provinces: 广东, 辽宁, 湖北, 陕西, 云南 (all prefecture-level cities in these provinces)
+  - Cities: 天津市, 重庆市, 深圳市, 厦门市, 杭州市, 南昌市, 贵阳市, 保定市
+- Batch 2 (2012): 1 province + 26 cities
+  - Province: 海南省
+  - Cities: 北京市, 上海市, 石家庄市, 秦皇岛市, etc.
+- Batch 3 (2017): 45 cities
+  - Cities: 乌海市, 沈阳市, 大连市, 朝阳市, etc.
 
 **Construction Logic:**
 ```python
-# Pseudo-code (to be implemented)
-def construct_did_variable(df, pilot_list):
-    """
-    pilot_list: dict with {city_name: pilot_year}
-    """
-    df['treat'] = df['city_name'].isin(pilot_list.keys()).astype(int)
-    df['post'] = df['year'] >= df['city_name'].map(pilot_list)
-    df['did'] = df['treat'] * df['post']
-    return df
+# Implemented in construct_did_variable.py
+city_to_pilot_year = {}  # Maps city_name to pilot_year (2010, 2012, or 2017)
+
+# For province-level pilots, all cities in that province are included
+df['treat'] = df['city_name'].map(city_to_pilot_year).notna().astype(int)
+df['pilot_year'] = df['city_name'].map(city_to_pilot_year)
+df['post'] = df['year'] >= df['pilot_year']
+df['did'] = df['treat'] * df['post']
 ```
 
-**Data Source Needed:** Official pilot city lists from NDRC (National Development and Reform Commission) documents for 2010, 2012, 2017 batches.
+**Key Features:**
+- Multi-period DID with different implementation years
+- Province-level pilots cover all prefecture cities in that province
+- If a city appears in multiple batches, earliest year is used
+- DID=1 only when year ≥ pilot_year for that city
 
 ### Theoretical Framework
 
@@ -192,11 +211,14 @@ Traditional STIRPAT: `I = P × A × T`
 - `原始数据/296个地级市GDP相关数据（以2000年为基期）.xlsx` - GDP with deflator
 - `原始数据/地级市碳排放强度.xlsx` - Carbon emissions
 - `原始数据/2000-2023地级市产业结构 .xlsx` - Industrial structure
+- `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` - Foreign direct investment
+- `原始数据/各省+地级市+县级市人均道路面积.xlsx` - Road area (Sheet 1: prefecture-level)
 
 ### Processed Data
-- `总数据集_2007-2023_最终版.xlsx` - **RECOMMENDED FOR ANALYSIS** (3,672 obs, 100% complete)
-- `总数据集_2007-2023_清洗版.xlsx` - Previous version (has outliers, 4,488 obs)
+- `总数据集_2007-2023_完整版.xlsx` - **RECOMMENDED FOR ANALYSIS** (3,672 obs × 19 variables, 100% complete)
+- `总数据集_2007-2023_最终版.xlsx` - Previous version (11 variables, before DID/FDI/road_area)
 - `描述性统计表_最终版.xlsx` - Descriptive statistics
+- `试点城市名单.xlsx` - List of all pilot cities with implementation years
 
 ### Python Scripts (py代码文件/)
 **Data Merging:**
@@ -210,6 +232,9 @@ Traditional STIRPAT: `I = P × A × T`
 - `verify_final_data.py` - Quality validation
 
 **Variable Construction:**
+- `construct_did_variable.py` - **Build DID policy variables** (3 batches: 2010, 2012, 2017)
+- `process_fdi_data.py` - Process FDI and calculate FDI openness ratio
+- `add_road_area_variable.py` - Add prefecture-level road area data
 - `reconstruct_carbon_intensity.py` - Recalculate CEI with correct base period
 - `add_population_variables.py` - Add population and per capita GDP
 - `generate_final_stats.py` - Generate descriptive statistics table
@@ -247,6 +272,18 @@ Traditional STIRPAT: `I = P × A × T`
    - Population data available: 1998-2024 (27 years)
    - Align to common period across all datasets
 
+6. **FDI Data Processing**
+   - CRITICAL: Use correct unit conversion (divide by 100, not 10000)
+   - Use nominal GDP (real GDP × deflator), not real GDP
+   - Use year-specific exchange rates, not fixed rate
+   - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
+
+7. **City-Level Data Granularity**
+   - Always use full 6-digit city codes for matching
+   - NEVER use `// 10000` operation which converts city codes to province codes
+   - This causes data aggregation loss (all cities in same province get same value)
+   - Verify uniqueness: each province should have multiple unique values, not just 1
+
 ## Common Workflows
 
 ### Adding New Variables
@@ -275,9 +312,17 @@ py py代码文件/verify_final_data.py
 
 ## Git Commit History (Key Revisions)
 
-- `6762728` - Fix GDP deflator anomalies and missing population data (Jan 2, 22:05)
+- `aa24ff7` - Delete province-level road area sheet, keep prefecture-level data (Jan 6)
+- `99ac6b6` - Fix road area variable to prefecture-level (Jan 6)
+- `0a45d06` - Add road area per capita variable (ln_road_area) (Jan 6)
+- `e8091f8` - Clean up project files, keep only final complete version (Jan 6)
+- `ed78308` - Fix 5 critical errors in FDI data processing (Jan 6)
+- `3fa7517` - Add FDI data and calculate FDI openness ratio (Jan 6)
+- `8034e8a` - Construct DID policy variables and update dataset (Jan 2)
+- `beddacc` - Improve CLAUDE.md documentation and clean up old files (Jan 2)
+- `6762728` - Fix GDP deflator anomalies and missing population data (Jan 2)
 - `0d75af1` - Rewrite README based on research proposal (Jan 2)
-- `108e7f9` - Fix carbon intensity units and add population variables (Jan 2, 21:35)
+- `108e7f9` - Fix carbon intensity units and add population variables (Jan 2)
 
 ## Research Plan Reference
 
@@ -297,10 +342,10 @@ See `实验思路md` (408 lines) for:
 
 ## Notes for Future Development
 
-1. **DID Variable Construction** is the next critical task
-   - Need official pilot city lists for all three batches
-   - Must handle time-varying treatment (different years for different cities)
-   - Verify city names match between pilot lists and dataset
+1. **Regression Analysis** is the next critical task
+   - Use final dataset: `总数据集_2007-2023_完整版.xlsx` (19 variables)
+   - Baseline model: `CEI_it = α₀ + β₁·DID_it + β₂·ln(pop_den) + Controls + μᵢ + νₜ + ε_it`
+   - Verify DID variable works correctly with multi-period policy
 
 2. **Stata/Python Selection**
    - Can use either Stata or Python for regression
@@ -317,3 +362,8 @@ See `实验思路md` (408 lines) for:
    - Always update `数据清理计划.md` after changes
    - Include: timestamp, changes made, rationale, data quality metrics
    - Use Chinese for documentation (maintains consistency)
+
+5. **Variable Additions Completed**
+   - DID policy variables: `did`, `treat`, `post`, `pilot_year`
+   - FDI openness: `fdi_openness` (correctly calculated with nominal GDP, year-specific rates)
+   - Infrastructure: `road_area`, `ln_road_area` (prefecture-level, NOT province-level)
