@@ -1,7 +1,7 @@
 """
-添加人均道路面积变量到主数据集
+添加人均道路面积变量到主数据集（地级市级别）
 功能：
-1. 读取道路面积原始数据
+1. 读取地级市道路面积数据
 2. 提取并筛选2007-2023年数据
 3. 标准化城市代码格式
 4. 左连接合并到主数据集
@@ -9,6 +9,7 @@
 
 作者：Claude Code
 日期：2025-01-06
+版本：2.0 - 使用地级市级别数据
 """
 
 import pandas as pd
@@ -19,7 +20,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 print("=" * 80)
-print("添加人均道路面积变量")
+print("添加人均道路面积变量（地级市级别）")
 print("=" * 80)
 print(f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -29,16 +30,15 @@ MAIN_DATA = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_完�
 OUTPUT_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_完整版.xlsx")
 
 # ================================
-# 步骤1：读取道路面积数据
+# 步骤1：读取道路面积数据（地级市级别）
 # ================================
-print("\n[步骤1/5] 读取道路面积数据...")
+print("\n[步骤1/5] 读取地级市道路面积数据...")
 
 try:
-    df_road = pd.read_excel(ROAD_FILE)
+    # 读取第2个sheet："地级市+地级市"
+    df_road = pd.read_excel(ROAD_FILE, sheet_name=1)
     print(f"[OK] 原始数据维度: {df_road.shape}")
-    print(f"  列名: {list(df_road.columns)}")
-    print(f"\n前5行数据预览:")
-    print(df_road.head())
+    print(f"  Sheet: 地级市+地级市")
 except FileNotFoundError:
     print(f"[ERROR] 找不到文件 {ROAD_FILE}")
     exit(1)
@@ -48,15 +48,16 @@ except FileNotFoundError:
 # ================================
 print("\n[步骤2/5] 提取关键字段并筛选2007-2023年数据...")
 
-# 数据结构：[年份, 省份, 省份代码, 人均道路面积（平方米）, ...]
+# 数据结构：[年份, 省份, 省份代码, 城市, 城市代码, 人均道路面积, 人均道路面积 线性插值, ...]
 # 使用列位置提取（避免中文编码问题）
-df_road_clean = df_road.iloc[:, [0, 2, 3]].copy()  # 年份, 省份代码, 人均道路面积
+# 索引: 0=年份, 3=城市, 4=城市代码, 6=人均道路面积（线性插值）
+df_road_clean = df_road.iloc[:, [0, 3, 4, 6]].copy()
 
 # 重命名列
-df_road_clean.columns = ['year', 'city_code', 'road_area']
+df_road_clean.columns = ['year', 'city_name', 'city_code', 'road_area']
 
 print(f"提取后数据结构:")
-print(df_road_clean.head())
+print(df_road_clean.head(10))
 
 # 筛选2007-2023年
 df_road_clean['year'] = pd.to_numeric(df_road_clean['year'], errors='coerce')
@@ -65,9 +66,9 @@ df_road_clean = df_road_clean[
     (df_road_clean['year'] <= 2023)
 ]
 
-print(f"[OK] 筛选后数据维度: {df_road_clean.shape}")
+print(f"\n[OK] 筛选后数据维度: {df_road_clean.shape}")
 print(f"  年份范围: {df_road_clean['year'].min()} - {df_road_clean['year'].max()}")
-print(f"  城市数量: {df_road_clean['city_code'].nunique()}")
+print(f"  城市数量: {df_road_clean['city_name'].nunique()}")
 
 # ================================
 # 步骤3：标准化城市代码
@@ -79,16 +80,12 @@ print(f"标准化前城市代码示例: {df_road_clean['city_code'].head().tolis
 # 转换城市代码为整数（去除小数点）
 df_road_clean['city_code'] = pd.to_numeric(df_road_clean['city_code'], errors='coerce').astype('Int64')
 
-# 将6位省份代码转换为2位（例如110000 -> 11）
-# 因为地级市city_code前2位就是省份代码
-df_road_clean['city_code'] = (df_road_clean['city_code'] // 10000).astype(int)
-
 # 去重：确保每个城市每年只有一条记录
 before_dedup = len(df_road_clean)
 df_road_clean = df_road_clean.drop_duplicates(subset=['year', 'city_code'], keep='first')
 after_dedup = len(df_road_clean)
 
-print(f"[OK] 标准化后省份代码示例: {df_road_clean['city_code'].head().tolist()}")
+print(f"[OK] 标准化后城市代码示例: {df_road_clean['city_code'].head().tolist()}")
 print(f"[OK] 去重: {before_dedup} -> {after_dedup} (去除{before_dedup - after_dedup}条重复)")
 
 # 检查road_area数据
@@ -120,23 +117,11 @@ if 'road_area' in df_main.columns:
 # 检查主数据集的city_code格式
 print(f"\n主数据集城市代码示例: {df_main['city_code'].head().tolist()}")
 
-# 从city_code提取省份代码（前2位）
-# 例如：460200 -> 46 (海南省)
-df_main['province_code'] = (df_main['city_code'] // 10000).astype(int)
-
-print(f"\n提取的省份代码示例: {df_main['province_code'].unique()[:10].tolist()}")
-
-# 准备道路数据：将city_code重命名为province_code
-df_road_for_merge = df_road_clean.copy()
-df_road_for_merge = df_road_for_merge.rename(columns={'city_code': 'province_code'})
-
-print(f"\n道路数据省份代码示例: {df_road_for_merge['province_code'].unique()[:10].tolist()}")
-
-# 左连接（以主数据集为基准，使用province_code和year匹配）
+# 左连接（以主数据集为基准，使用city_code和year匹配）
 df_merged = pd.merge(
     df_main,
-    df_road_for_merge[['year', 'province_code', 'road_area']],
-    on=['year', 'province_code'],
+    df_road_clean[['year', 'city_code', 'road_area']],
+    on=['year', 'city_code'],
     how='left'
 )
 
@@ -172,12 +157,6 @@ print(f"  road_area = 0 的观测: {(df_merged['road_area'] == 0).sum()}")
 print(f"  road_area < 0 的观测: {(df_merged['road_area'] < 0).sum()}")
 print(f"  ln_road_area = 0 的观测: {(df_merged['ln_road_area'] == 0).sum()} (即road_area=0)")
 
-# 删除临时的province_code列（保留road_area和ln_road_area）
-df_merged = df_merged.drop(columns=['province_code'])
-
-print(f"\n[OK] 已删除临时列province_code")
-print(f"最终数据集维度: {df_merged.shape}")
-
 # ================================
 # 保存数据
 # ================================
@@ -192,12 +171,12 @@ print(f"[OK] 数据已保存到: {OUTPUT_FILE}")
 # 生成报告
 # ================================
 print("\n" + "=" * 80)
-print("人均道路面积变量添加总结")
+print("人均道路面积变量添加总结（地级市级别）")
 print("=" * 80)
 
 print(f"\n1. 原始数据:")
 print(f"   - 观测数: {len(df_road_clean)}")
-print(f"   - 城市数: {df_road_clean['city_code'].nunique()}")
+print(f"   - 城市数: {df_road_clean['city_name'].nunique()}")
 print(f"   - 年份范围: {df_road_clean['year'].min()} - {df_road_clean['year'].max()}")
 
 print(f"\n2. 数据质量:")
@@ -216,7 +195,7 @@ print(f"   - road_area 范围: {df_merged['road_area'].min():.2f} - {df_merged['
 print(f"   - ln_road_area 均值: {df_merged['ln_road_area'].mean():.4f}")
 
 print(f"\n5. 变量说明:")
-print(f"   - road_area: 人均道路面积（平方米/人）")
+print(f"   - road_area: 人均道路面积（平方米/人），地级市级别")
 print(f"   - ln_road_area: 对数人均道路面积，ln(road_area + 1)")
 print(f"   - 加1是为了处理0值，避免对数运算报错")
 
