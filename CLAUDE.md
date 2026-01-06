@@ -17,17 +17,25 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 ### Completed Work
 - ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area)
 - ✅ Data cleaning: Removed outliers, handled missing values, ensured data quality
+- ✅ Variable transformation: All continuous variables log-transformed and winsorized (1% and 99% percentiles)
 - ✅ DID variable construction: Three-batch pilot policy (2010, 2012, 2017) implemented
-- ✅ FDI processing: Added FDI openness ratio (fdi_rmb/gdp_nominal) with year-specific exchange rates
-- ✅ Road area: Added prefecture-level road area variable (ln_road_area)
-- ✅ Final dataset: `总数据集_2007-2023_完整版.xlsx` (3,672 obs × 216 cities × 19 variables, 100% complete)
-- ✅ Documentation: Complete data cleaning log in `数据清理计划.md`
+- ✅ FDI processing: Added FDI openness ratio with year-specific exchange rates
+- ✅ Road area: Added prefecture-level road area variable
+- ✅ Baseline DID regression: Two-way fixed effects model completed
+- ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,672 obs × 216 cities × 24 variables, 100% complete)
+
+### Regression Results
+- **Model (1) - No controls:** DID coefficient 0.0186* (p=0.083, significant at 10% level)
+- **Model (2) - With controls:** DID coefficient 0.0204 (p=0.459, not significant)
+- **Key finding:** Policy effect not statistically significant after clustering standard errors at city level
+- **Control variables:** ln_pgdp***, ln_pop_density***, tertiary_share***, ln_road_area*** all significant
+- **Model fit:** R² > 0.97 for both models
 
 ### Next Steps
-- [ ] Baseline DID regression with city and year fixed effects
-- [ ] Robustness testing (parallel trends, PSM-DID, placebo tests)
-- [ ] Heterogeneity analysis
-- [ ] Mechanism testing
+- [ ] Parallel trends test (Event Study) - CRITICAL for DID validity
+- [ ] Robustness testing (PSM-DID, placebo tests, exclude concurrent policies)
+- [ ] Heterogeneity analysis (by batch, region, city size)
+- [ ] Mechanism testing (industrial structure, technology innovation)
 
 ## Data Processing Commands
 
@@ -215,12 +223,15 @@ Traditional STIRPAT: `I = P × A × T`
 - `原始数据/各省+地级市+县级市人均道路面积.xlsx` - Road area (Sheet 1: prefecture-level)
 
 ### Processed Data
-- `总数据集_2007-2023_完整版.xlsx` - **RECOMMENDED FOR ANALYSIS** (3,672 obs × 19 variables, 100% complete)
-- `总数据集_2007-2023_最终版.xlsx` - Previous version (11 variables, before DID/FDI/road_area)
-- `描述性统计表_最终版.xlsx` - Descriptive statistics
+- `总数据集_2007-2023_最终回归版.xlsx` - **RECOMMENDED FOR REGRESSION** (3,672 obs × 24 variables, 100% complete, log-transformed and winsorized)
+- `总数据集_2007-2023_完整版.xlsx` - Original merged data (3,672 obs × 19 variables)
+- `描述性统计表_最终回归版.xlsx` - Descriptive statistics with distribution tests
+- `基准回归结果表.xlsx` - Baseline DID regression results
+- `缩尾处理报告.xlsx` - Winsorization treatment report
 - `试点城市名单.xlsx` - List of all pilot cities with implementation years
 
 ### Python Scripts (py代码文件/)
+
 **Data Merging:**
 - `merge_final.py` - Initial 3-dataset merge (population + GDP + carbon)
 - `merge_industrial_structure.py` - Add industrial structure data
@@ -239,9 +250,23 @@ Traditional STIRPAT: `I = P × A × T`
 - `add_population_variables.py` - Add population and per capita GDP
 - `generate_final_stats.py` - Generate descriptive statistics table
 
+**Data Transformation (Regression Preparation):**
+- `transform_variables_for_regression.py` - Generate log variables (ln_pop_density, ln_pgdp, ln_pop, ln_fdi)
+- `winsorize_and_log_transform.py` - **Apply 1%/99% winsorization and ln(carbon_intensity)**
+- `generate_regression_ready_stats.py` - Generate descriptive statistics for regression
+- `generate_final_winsorized_stats.py` - Generate final regression statistics with distribution tests
+
+**Regression Analysis:**
+- `did_baseline_regression.py` - **Baseline DID regression with two-way fixed effects and clustered SE**
+  - Implements LSDV (Least Squares Dummy Variable) method manually
+  - City and year fixed effects via dummy variables
+  - Cluster-robust standard errors at city level
+  - Uses pandas, numpy, scipy only (no linearmodels dependency)
+
 ### Documentation
-- `数据清理计划.md` - Complete data cleaning log (Chinese, detailed steps)
+- `数据清理计划.md` - Complete data cleaning log (Chinese, detailed steps, 17 sections)
 - `实验思路md` - Research design and methodology (Chinese, 408 lines)
+- `基础回归记录表.md` - **Baseline DID regression documentation** (model specification, results, interpretation)
 - `README.md` - Project overview (bilingual)
 - `CLAUDE.md` - This file (guidance for AI assistants)
 
@@ -293,6 +318,30 @@ Traditional STIRPAT: `I = P × A × T`
 4. Update descriptive statistics
 5. Document in `数据清理计划.md`
 
+### Running DID Regression
+```bash
+# Run baseline DID regression (two-way fixed effects with clustered SE)
+py py代码文件/did_baseline_regression.py
+
+# Output files:
+# - 基准回归结果表.xlsx (regression results comparison)
+# - Console output with detailed statistics
+```
+
+**Model Specification:**
+```
+ln(CEI_it) = α₀ + β₁·did_it + β₂·ln_pgdp_it + β₃·ln_pop_density_it
+             + β₄·tertiary_share_it + β₅·ln_fdi_it + β₆·ln_road_area_it
+             + μᵢ + νₜ + ε_it
+```
+
+**Key Points:**
+- Dependent variable: `ln_carbon_intensity` (log-transformed, winsorized)
+- All controls: log-transformed and winsorized (except tertiary_share)
+- Fixed effects: 215 city dummies + 16 year dummies (231 total)
+- Standard errors: Clustered at city level (216 clusters)
+- Significance: *** p<0.01, ** p<0.05, * p<0.1
+
 ### Diagnosing Data Issues
 ```bash
 # Run comprehensive diagnostic
@@ -302,27 +351,18 @@ py py代码文件/diagnose_data_issues.py
 py py代码文件/verify_final_data.py
 ```
 
-### Updating Documentation
-- After any data change: Update `数据清理计划.md` with timestamp
-- Commit to Git with descriptive message following convention:
-  - `feat:` for new features/variables
-  - `fix:` for bug fixes/data quality issues
-  - `docs:` for documentation updates
-  - `data:` for data updates
-
 ## Git Commit History (Key Revisions)
 
+- `515eb83` - Complete baseline DID regression analysis with two-way fixed effects (Jan 6)
+- `ca942af` - Log-transform carbon intensity and winsorize continuous variables (Jan 6)
+- `c4b62a5` - Generate log variables and descriptive statistics for regression (Jan 6)
+- `b40dd4d` - Update CLAUDE.md with latest data processing progress (Jan 6)
 - `aa24ff7` - Delete province-level road area sheet, keep prefecture-level data (Jan 6)
 - `99ac6b6` - Fix road area variable to prefecture-level (Jan 6)
 - `0a45d06` - Add road area per capita variable (ln_road_area) (Jan 6)
 - `e8091f8` - Clean up project files, keep only final complete version (Jan 6)
 - `ed78308` - Fix 5 critical errors in FDI data processing (Jan 6)
 - `3fa7517` - Add FDI data and calculate FDI openness ratio (Jan 6)
-- `8034e8a` - Construct DID policy variables and update dataset (Jan 2)
-- `beddacc` - Improve CLAUDE.md documentation and clean up old files (Jan 2)
-- `6762728` - Fix GDP deflator anomalies and missing population data (Jan 2)
-- `0d75af1` - Rewrite README based on research proposal (Jan 2)
-- `108e7f9` - Fix carbon intensity units and add population variables (Jan 2)
 
 ## Research Plan Reference
 
@@ -340,30 +380,102 @@ See `实验思路md` (408 lines) for:
 - Section 3: Multi-period DID model specification
 - Section 4: Robustness testing (6 comprehensive methods)
 
-## Notes for Future Development
+## Important Constraints
 
-1. **Regression Analysis** is the next critical task
-   - Use final dataset: `总数据集_2007-2023_完整版.xlsx` (19 variables)
-   - Baseline model: `CEI_it = α₀ + β₁·DID_it + β₂·ln(pop_den) + Controls + μᵢ + νₜ + ε_it`
-   - Verify DID variable works correctly with multi-period policy
+1. **Data Integrity**
+   - Never modify files in `原始数据/` (keep originals intact)
+   - Always use column positions (indices) not names when reading Excel with Chinese headers
+   - Use `city_name` + `year` as merge keys (not `city_code`)
 
-2. **Stata/Python Selection**
-   - Can use either Stata or Python for regression
-   - Stata: `reghdfe` for fixed effects, `estat ptrends` for parallel trends
-   - Python: `linearmodels` package (`PanelOLS` with entity and time effects)
+2. **Data Quality Standards**
+   - GDP deflator must be > 0.8 (consistent base period)
+   - Missing data rate must be < 5% for any variable
+   - Prefer deletion over heavy imputation
+   - All continuous variables are log-transformed and winsorized (1%/99%)
 
-3. **Robustness Tests Priority**
-   1. Parallel trends (event study) - CRITICAL for DID validity
-   2. PSM-DID (address selection bias)
-   3. Placebo test (random treatment assignment)
-   4. Excluding concurrent policies (Smart City, Innovative City pilots)
+3. **Encoding Issues**
+   - Windows console uses GBK encoding
+   - Avoid Chinese characters in console output (use [WARNING], [OK] instead of emojis)
+   - If script fails with UnicodeEncodeError, remove special Unicode characters (², ³, etc.)
+   - Replace R² with R2 in print statements
 
-4. **Data Documentation**
-   - Always update `数据清理计划.md` after changes
-   - Include: timestamp, changes made, rationale, data quality metrics
-   - Use Chinese for documentation (maintains consistency)
+4. **Sample Selection**
+   - Final sample: 216 cities (excluded 48 due to data quality)
+   - Must document reasons for excluding any cities
+   - Prioritize data quality over sample size
 
-5. **Variable Additions Completed**
-   - DID policy variables: `did`, `treat`, `post`, `pilot_year`
-   - FDI openness: `fdi_openness` (correctly calculated with nominal GDP, year-specific rates)
-   - Infrastructure: `road_area`, `ln_road_area` (prefecture-level, NOT province-level)
+5. **Time Period**
+   - Core analysis: 2007-2023 (17 years)
+   - Population data available: 1998-2024 (27 years)
+   - Align to common period across all datasets
+
+6. **FDI Data Processing**
+   - CRITICAL: Use correct unit conversion (divide by 100, not 10000)
+   - Use nominal GDP (real GDP × deflator), not real GDP
+   - Use year-specific exchange rates, not fixed rate
+   - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
+
+7. **City-Level Data Granularity**
+   - Always use full 6-digit city codes for matching
+   - NEVER use `// 10000` operation which converts city codes to province codes
+   - This causes data aggregation loss (all cities in same province get same value)
+   - Verify uniqueness: each province should have multiple unique values, not just 1
+
+8. **Regression Analysis Requirements**
+   - **Always use log-transformed dependent variable:** `ln_carbon_intensity`
+   - **All continuous control variables are log-transformed and winsorized**
+   - **Must include city and year fixed effects** (two-way FE model)
+   - **Cluster standard errors at city level** (216 clusters)
+   - Report both coefficients with and without clustering for comparison
+   - Use LSDV method if linearmodels package unavailable
+
+9. **Package Dependencies**
+   - **Core packages:** pandas 2.0.3, numpy 1.24.4
+   - **Optional:** scipy (for t-distribution in p-value calculation)
+   - **NOT installed:** linearmodels (use manual LSDV implementation instead)
+   - If network unavailable, rely on manual OLS implementation (see `did_baseline_regression.py`)
+
+
+## Regression Analysis Notes
+
+### Current Baseline Results
+
+**Data:** `总数据集_2007-2023_最终回归版.xlsx`
+- 3,672 observations × 216 cities × 17 years
+- Dependent variable: `ln_carbon_intensity` (log-transformed, winsorized)
+- All continuous controls: log-transformed and winsorized
+
+**Key Findings:**
+- Model (1) no controls: DID coef = 0.0186* (p=0.083, significant at 10%)
+- Model (2) with controls: DID coef = 0.0204 (p=0.459, clustered SE, not significant)
+- Policy effect NOT statistically significant after clustering
+- Control variables highly significant (ln_pgdp***, ln_pop_density***, tertiary_share***, ln_road_area***)
+- Model fit: R² > 0.97 for both models
+
+**Interpretation:**
+- Policy shows small positive effect on emissions (unexpected direction)
+- Not statistically distinguishable from zero with clustered SE
+- Possible reasons: sample heterogeneity, time lags, implementation variation
+- Control variables absorb much of the variation (GDP, density, industrial structure)
+
+### Next Analysis Steps
+
+1. **Parallel Trends Test** (CRITICAL - next priority)
+   - Event study to verify pre-trend parallelism
+   - Plot DID coefficients by year relative to treatment
+   - Essential for DID validity
+
+2. **Heterogeneity Analysis**
+   - By pilot batch (2010 vs 2012 vs 2017)
+   - By region (East vs Central vs West)
+   - By city size/development level
+
+3. **Robustness Tests**
+   - PSM-DID (Propensity Score Matching + DID)
+   - Placebo test (random treatment assignment)
+   - Exclude concurrent policies (Smart City, Innovative City pilots)
+
+4. **Mechanism Testing**
+   - Industrial structure channel (tertiary_share)
+   - Technology innovation channel
+   - Energy structure optimization channel
