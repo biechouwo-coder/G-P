@@ -59,7 +59,7 @@ print(df_fdi.head())
 
 # 清洗城市名称
 def clean_city_name(name):
-    """清洗城市名称：添加"市"后缀，去除特殊字符"""
+    """清洗城市名称：添加"市"后缀，去除特殊字符，处理城市更名"""
     if pd.isna(name):
         return name
 
@@ -68,6 +68,17 @@ def clean_city_name(name):
     # 去除零宽空格等特殊字符
     name = name.replace('\u200b', '').replace('\u200c', '').replace('\u200d', '')
     name = name.replace('\xa0', ' ').strip()
+
+    # 处理城市更名（统一使用新名称）
+    city_rename_map = {
+        '襄樊市': '襄阳市',  # 2010年更名
+        '思茅市': '普洱市',   # 2007年更名
+        '襄樊': '襄阳市',
+        '思茅': '普洱市'
+    }
+
+    if name in city_rename_map:
+        name = city_rename_map[name]
 
     # 如果不以"市"结尾，且不是特殊的地区类型，添加"市"
     if not name.endswith(('市', '地区', '自治区', '自治州', '盟')):
@@ -176,7 +187,7 @@ print(f"[OK] 主数据集维度: {df_main.shape}")
 print(f"  列名: {list(df_main.columns)}")
 
 # 选择需要的列
-df_main_subset = df_main[['city_name', 'year', 'gdp_real']].copy()
+df_main_subset = df_main[['city_name', 'year', 'gdp_real', 'gdp_deflator']].copy()
 
 # 合并FDI和GDP数据
 df_merged = pd.merge(
@@ -188,14 +199,35 @@ df_merged = pd.merge(
 
 print(f"\n[OK] 合并后数据维度: {df_merged.shape}")
 
-# 计算FDI开放度
-# 注意：FDI单位是百万美元，GDP单位是亿元（2000年基期）
-# 需要统一单位：
-# FDI: 百万美元 -> 亿元（按汇率约7.0换算）
-exchange_rate = 7.0  # 1美元 = 7人民币（近似值）
+# ================================
+# 计算FDI开放度（修正版）
+# ================================
+# 年平均汇率字典（人民币/美元）
+exchange_rates = {
+    2007: 7.6040, 2008: 6.9451, 2009: 6.8310, 2010: 6.7695,
+    2011: 6.4588, 2012: 6.3125, 2013: 6.1928, 2014: 6.1428,
+    2015: 6.2284, 2016: 6.6423, 2017: 6.7518, 2018: 6.6174,
+    2019: 6.8985, 2020: 6.8976, 2021: 6.4515, 2022: 6.7261,
+    2023: 7.0467
+}
 
-df_merged['fdi_rmb'] = df_merged['fdi'] * exchange_rate / 10000  # 百万美元 -> 亿元
-df_merged['fdi_openness'] = df_merged['fdi_rmb'] / df_merged['gdp_real']
+# 为每个年份匹配对应汇率
+df_merged['exchange_rate'] = df_merged['year'].map(exchange_rates)
+
+# 计算名义GDP（从实际GDP还原）
+# 名义GDP = 实际GDP × GDP平减指数
+df_merged['gdp_nominal'] = df_merged['gdp_real'] * df_merged['gdp_deflator']
+
+# 计算FDI开放度
+# FDI单位：百万美元
+# GDP单位：亿元（名义值）
+# 转换：百万美元 × 汇率 / 100 = 亿元
+df_merged['fdi_rmb'] = df_merged['fdi'] * df_merged['exchange_rate'] / 100  # 百万美元 -> 亿元
+df_merged['fdi_openness'] = df_merged['fdi_rmb'] / df_merged['gdp_nominal']  # 使用名义GDP
+
+print(f"\n[OK] FDI开放度计算完成（使用名义GDP + 年度汇率）")
+print(f"  汇率范围: {df_merged['exchange_rate'].min():.4f} - {df_merged['exchange_rate'].max():.4f}")
+print(f"  名义GDP范围: {df_merged['gdp_nominal'].min():.2f} - {df_merged['gdp_nominal'].max():.2f} 亿元")
 
 print(f"\n[OK] FDI开放度统计:")
 print(df_merged['fdi_openness'].describe())
