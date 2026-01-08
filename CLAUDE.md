@@ -12,7 +12,7 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 **Repository:** https://github.com/biechouwo-coder/G-P.git
 
-## Current Status (January 6, 2025)
+## Current Status (January 8, 2025)
 
 ### Completed Work
 - ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area)
@@ -23,6 +23,7 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Road area: Added prefecture-level road area variable
 - ✅ Baseline DID regression: Two-way fixed effects model completed
 - ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,672 obs × 216 cities × 24 variables, 100% complete)
+- ✅ Propensity Score Matching (PSM): Year-by-year matching with 5 covariates completed
 
 ### Regression Results
 - **Model (1) - No controls:** DID coefficient 0.0186* (p=0.083, significant at 10% level)
@@ -32,8 +33,9 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - **Model fit:** R² > 0.97 for both models
 
 ### Next Steps
+- [ ] PSM-DID regression using matched dataset
 - [ ] Parallel trends test (Event Study) - CRITICAL for DID validity
-- [ ] Robustness testing (PSM-DID, placebo tests, exclude concurrent policies)
+- [ ] Robustness testing (placebo tests, exclude concurrent policies)
 - [ ] Heterogeneity analysis (by batch, region, city size)
 - [ ] Mechanism testing (industrial structure, technology innovation)
 
@@ -224,6 +226,10 @@ Traditional STIRPAT: `I = P × A × T`
 
 ### Processed Data
 - `总数据集_2007-2023_最终回归版.xlsx` - **RECOMMENDED FOR REGRESSION** (3,672 obs × 24 variables, 100% complete, log-transformed and winsorized)
+- `倾向得分匹配_匹配后数据集.xlsx` - **PSM-MATCHED SAMPLE** (3,162 obs × 24 variables, matched 1:1 with replacement)
+- `倾向得分匹配_平衡性检验.xlsx` - Balance diagnostics (standardized bias before/after matching)
+- `倾向得分匹配_年度统计.xlsx` - Yearly Logit regression statistics (pseudo R², PS distribution)
+- `倾向得分匹配_汇总报告.xlsx` - Comprehensive PSM summary report
 - `总数据集_2007-2023_完整版.xlsx` - Original merged data (3,672 obs × 19 variables)
 - `描述性统计表_最终回归版.xlsx` - Descriptive statistics with distribution tests
 - `基准回归结果表.xlsx` - Baseline DID regression results
@@ -262,6 +268,16 @@ Traditional STIRPAT: `I = P × A × T`
   - City and year fixed effects via dummy variables
   - Cluster-robust standard errors at city level
   - Uses pandas, numpy, scipy only (no linearmodels dependency)
+
+**Robustness Testing:**
+- `propensity_score_matching.py` - **Propensity Score Matching (PSM) for PSM-DID**
+  - Year-by-year Logit regression (not pooled across years)
+  - 1:1 nearest neighbor matching with replacement
+  - Caliper: 0.05 (propensity score difference threshold)
+  - 5 covariates: ln_pgdp, ln_pop_density, tertiary_share, ln_fdi, ln_road_area
+  - Balance diagnostics using standardized bias (< 10% threshold)
+  - Uses sklearn.linear_model.LogisticRegression
+  - Outputs: matched dataset, balance statistics, yearly summary
 
 ### Documentation
 - `数据清理计划.md` - Complete data cleaning log (Chinese, detailed steps, 17 sections)
@@ -326,6 +342,25 @@ py py代码文件/did_baseline_regression.py
 # Output files:
 # - 基准回归结果表.xlsx (regression results comparison)
 # - Console output with detailed statistics
+```
+
+### Running Propensity Score Matching
+```bash
+# Run PSM analysis (year-by-year matching)
+py py代码文件/propensity_score_matching.py
+
+# Output files:
+# - 倾向得分匹配_匹配后数据集.xlsx (matched dataset for PSM-DID)
+# - 倾向得分匹配_平衡性检验.xlsx (balance diagnostics)
+# - 倾向得分匹配_年度统计.xlsx (yearly summary)
+# - 倾向得分匹配_汇总报告.xlsx (comprehensive report)
+
+# Matching specifications:
+# - 5 covariates: ln_pgdp, ln_pop_density, tertiary_share, ln_fdi, ln_road_area
+# - Method: 1:1 nearest neighbor matching with replacement
+# - Caliper: 0.05 (maximum propensity score difference)
+# - Year-by-year estimation (17 separate Logit regressions)
+# - Balance criterion: standardized bias < 10%
 ```
 
 **Model Specification:**
@@ -460,22 +495,27 @@ See `实验思路md` (408 lines) for:
 
 ### Next Analysis Steps
 
-1. **Parallel Trends Test** (CRITICAL - next priority)
+1. **PSM-DID Regression** (Next priority - use matched dataset)
+   - Run DID regression on `倾向得分匹配_匹配后数据集.xlsx`
+   - Compare PSM-DID results with baseline DID
+   - Assess whether matching changes policy effect estimates
+   - Expected: smaller but more reliable treatment effects
+
+2. **Parallel Trends Test** (CRITICAL for DID validity)
    - Event study to verify pre-trend parallelism
    - Plot DID coefficients by year relative to treatment
-   - Essential for DID validity
+   - Essential for DID identification assumption
 
-2. **Heterogeneity Analysis**
+3. **Heterogeneity Analysis**
    - By pilot batch (2010 vs 2012 vs 2017)
    - By region (East vs Central vs West)
    - By city size/development level
 
-3. **Robustness Tests**
-   - PSM-DID (Propensity Score Matching + DID)
+4. **Additional Robustness Tests**
    - Placebo test (random treatment assignment)
    - Exclude concurrent policies (Smart City, Innovative City pilots)
 
-4. **Mechanism Testing**
+5. **Mechanism Testing**
    - Industrial structure channel (tertiary_share)
    - Technology innovation channel
    - Energy structure optimization channel
