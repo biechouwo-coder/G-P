@@ -161,8 +161,18 @@ class PropensityScoreMatcher:
             pscores = logit_model.predict_proba(X)[:, 1]
 
             # 计算伪R2 (McFadden's R2)
-            loglike_null = -2 * np.log(len(y) - y.sum()) * y.sum() - 2 * np.log(y.sum()) * (len(y) - y.sum())
+            # 正确计算空模型的对数似然值（仅含截距项的模型）
+            p_bar = y.mean()  # 处理组平均比例
+            n_treat = y.sum()
+            n_control = len(y) - y.sum()
+
+            # 空模型的偏差 (-2倍对数似然值)
+            loglike_null = -2 * (n_treat * np.log(p_bar + 1e-10) + n_control * np.log(1 - p_bar + 1e-10))
+
+            # 完整模型的偏差 (-2倍对数似然值)
             loglike_model = -2 * np.sum(y * np.log(pscores + 1e-10) + (1-y) * np.log(1-pscores + 1e-10))
+
+            # McFadden's R2 = 1 - (loglike_model / loglike_null)
             mcfadden_r2 = 1 - loglike_model / loglike_null if loglike_null != 0 else 0
 
             print(f"  Logit回归结果:")
