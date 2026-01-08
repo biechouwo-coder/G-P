@@ -15,12 +15,22 @@ plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 # ============================================================================
-# 第一步：加载PSM匹配后数据集
+# 第一步：加载PSM匹配后数据集（含二产占比）
 # ============================================================================
-print('[OK] === 第一步：加载PSM匹配后数据集 ===')
+print('[OK] === 第一步：加载PSM匹配后数据集（含二产占比） ===')
 
 print('[OK] 加载PSM匹配后数据集...')
-df = pd.read_excel('倾向得分匹配_匹配后数据集.xlsx')
+# 尝试加载含二产占比的数据集，如果不存在则使用原数据集
+import os
+data_file = '二产占比模型_分析结果/PSM匹配后数据集_含二产占比.xlsx'
+if os.path.exists(data_file):
+    df = pd.read_excel(data_file)
+    use_secondary = True
+    print(f'[OK] 使用含二产占比的数据集')
+else:
+    df = pd.read_excel('倾向得分匹配_匹配后数据集.xlsx')
+    use_secondary = False
+    print(f'[OK] 使用原数据集（含三产占比）')
 print(f'[OK] 数据集加载成功: {df.shape[0]} 观测 × {df.shape[1]} 变量')
 
 # 设置面板标识
@@ -121,21 +131,35 @@ print('\n[OK] === 第五步：定义回归模型 ===')
 # 被解释变量
 y_var = 'ln_carbon_intensity'
 
-# 控制变量（6个，与PSM-DID基准回归一致）
-control_vars = [
-    'ln_pgdp',
-    'ln_pop_density',
-    'tertiary_share',
-    'tertiary_share_sq',
-    'ln_fdi',
-    'ln_road_area'
-]
+# 控制变量（6个，根据数据集自动选择）
+if use_secondary:
+    control_vars = [
+        'ln_pgdp',
+        'ln_pop_density',
+        'secondary_share',    # 使用二产占比
+        'secondary_share_sq', # 使用二产占比平方项
+        'ln_fdi',
+        'ln_road_area'
+    ]
+    industry_type = 'Secondary Industry Share'
+else:
+    control_vars = [
+        'ln_pgdp',
+        'ln_pop_density',
+        'tertiary_share',    # 使用三产占比
+        'tertiary_share_sq', # 使用三产占比平方项
+        'ln_fdi',
+        'ln_road_area'
+    ]
+    industry_type = 'Tertiary Industry Share'
 
 # 事件虚拟变量（排除基准期event_-1）
 event_vars_for_regression = [var for var in event_vars_sorted if var != 'event_-1']
 
 print(f'[OK] 被解释变量: {y_var}')
-print(f'[OK] 控制变量: {len(control_vars)} 个（与PSM-DID一致）')
+print(f'[OK] 控制变量: {len(control_vars)} 个（{industry_type}）')
+for i, var in enumerate(control_vars, 1):
+    print(f'      {i}. {var}')
 print(f'[OK] 事件虚拟变量: {len(event_vars_for_regression)} 个（排除基准期event_-1）')
 print(f'[OK] 基准期: event_-1（政策实施前一年）')
 
@@ -313,7 +337,17 @@ event_results = sorted(event_results, key=lambda x: x['relative_year'])
 
 # 转换为DataFrame并保存
 event_df = pd.DataFrame(event_results)
-output_file = '事件研究_平行趋势检验结果.xlsx'
+
+# 根据使用的数据类型确定输出目录和文件名
+if use_secondary:
+    output_dir = '二产占比模型_分析结果'
+    output_file = f'{output_dir}/事件研究_平行趋势检验结果_二产占比.xlsx'
+    fig_file = f'{output_dir}/事件研究_平行趋势检验图_二产占比.png'
+else:
+    output_dir = '.'
+    output_file = '事件研究_平行趋势检验结果.xlsx'
+    fig_file = '事件研究_平行趋势检验图.png'
+
 event_df.to_excel(output_file, index=False)
 print(f'[OK] 事件研究结果已保存: {output_file}')
 
@@ -435,13 +469,12 @@ for i, res in enumerate(plot_data):
 
 plt.tight_layout()
 
-# 保存图形
-fig_file = '事件研究_平行趋势检验图.png'
+# 保存图形（文件名已在前面定义）
 plt.savefig(fig_file, dpi=300, bbox_inches='tight')
 print(f'[OK] 事件研究图已保存: {fig_file}')
 
 plt.close()
 
 print('\n' + '='*80)
-print('[OK] 平行趋势检验（Event Study）分析完成！')
+print(f'[OK] 平行趋势检验（Event Study）分析完成！（{industry_type}）')
 print('='*80)
