@@ -27,7 +27,7 @@ class PropensityScoreMatcher:
     匹配策略:
     - 逐年Logit回归 (而非混合所有年份)
     - 1:1最近邻匹配 (有放回)
-    - 卡尺范围: 0.02 (倾向得分差异限制, 更严格的标准)
+    - 卡尺范围: 0.05 (倾向得分差异限制)
     """
 
     def __init__(self, data, covariates, treatment_var='treat', year_var='year',
@@ -205,7 +205,7 @@ class PropensityScoreMatcher:
         3. 允许重复匹配 (有放回)
         """
         print("\n" + "="*60)
-        print("[STEP 3] 执行1:1最近邻匹配 (有放回, 卡尺=0.02)")
+        print("[STEP 3] 执行1:1最近邻匹配 (有放回, 卡尺=0.05)")
         print("="*60)
 
         matched_indices = []
@@ -453,7 +453,7 @@ def main():
         covariates=covariates,
         treatment_var='treat',
         year_var='year',
-        caliper=0.02,  # 卡尺: 倾向得分差异 ≤ 0.02 (更严格的匹配标准)
+        caliper=0.05,  # 卡尺: 倾向得分差异 ≤ 0.05
         random_state=42
     )
 
