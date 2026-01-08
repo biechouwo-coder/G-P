@@ -24,6 +24,7 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Baseline DID regression: Two-way fixed effects model completed
 - ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,672 obs × 216 cities × 24 variables, 100% complete)
 - ✅ Propensity Score Matching (PSM): Year-by-year matching with 5 covariates completed
+- ✅ Squared term: Added `ln_pop_density_squared` to test nonlinear effects of population density
 
 ### Regression Results
 - **Model (1) - No controls:** DID coefficient 0.0186* (p=0.083, significant at 10% level)
@@ -268,6 +269,15 @@ Traditional STIRPAT: `I = P × A × T`
   - City and year fixed effects via dummy variables
   - Cluster-robust standard errors at city level
   - Uses pandas, numpy, scipy only (no linearmodels dependency)
+  - **Architecture pattern:**
+    ```python
+    # Standard regression pattern used throughout
+    def ols_regression(y, X):
+        X = np.column_stack([np.ones(len(y)), X])
+        beta = np.linalg.solve(np.dot(X.T, X), np.dot(X.T, y))
+        residuals = y - np.dot(X, beta)
+        # Calculate clustered SE by city
+    ```
 
 **Robustness Testing:**
 - `propensity_score_matching.py` - **Propensity Score Matching (PSM) for PSM-DID**
@@ -278,6 +288,12 @@ Traditional STIRPAT: `I = P × A × T`
   - Balance diagnostics using standardized bias (< 10% threshold)
   - Uses sklearn.linear_model.LogisticRegression
   - Outputs: matched dataset, balance statistics, yearly summary
+  - **Architecture:** Class-based design `PropensityScoreMatcher` with modular methods
+    - `handle_missing_values()` - Drop observations with missing covariates
+    - `estimate_propensity_scores()` - Year-by-year Logit models
+    - `perform_matching()` - 1:1 nearest neighbor with caliper
+    - `check_balance()` - Standardized bias calculations
+    - `generate_reports()` - Excel outputs for diagnostics
 
 ### Documentation
 - `数据清理计划.md` - Complete data cleaning log (Chinese, detailed steps, 17 sections)
@@ -385,6 +401,38 @@ py py代码文件/diagnose_data_issues.py
 # Check specific variable
 py py代码文件/verify_final_data.py
 ```
+
+### Extending the Analysis
+
+**Adding new variables to the dataset:**
+1. Create new script following pattern: `add_[variable_name].py`
+2. Load latest dataset: `总数据集_2007-2023_最终回归版.xlsx`
+3. Extract new data using column positions (not names) due to Chinese encoding
+4. Merge on `city_name` + `year` with `how='outer'`
+5. Handle missing values (delete if <5%, else consider imputation)
+6. Save with updated filename suffix
+7. Update descriptive statistics
+
+**Adding squared or interaction terms:**
+```python
+# Pattern from add_squared_term.py
+import pandas as pd
+
+df = pd.read_excel('总数据集_2007-2023_最终回归版.xlsx')
+
+# Add squared term
+df['ln_pop_density_squared'] = df['ln_pop_density'] ** 2
+
+# Save with new suffix
+df.to_excel('总数据集_2007-2023_最终回归版_平方项.xlsx', index=False)
+```
+
+**Running new DID specifications:**
+1. Copy `did_baseline_regression.py` as template
+2. Modify `control_vars` list to include new variables
+3. Update model specification in comments
+4. Run and save results to new Excel file
+5. Document findings in CLAUDE.md status section
 
 ## Git Commit History (Key Revisions)
 
@@ -519,3 +567,68 @@ See `实验思路md` (408 lines) for:
    - Industrial structure channel (tertiary_share)
    - Technology innovation channel
    - Energy structure optimization channel
+
+### Understanding Regression Output Structure
+
+**Excel output format from `did_baseline_regression.py`:**
+- **Sheet 1: Model Comparison** - Side-by-side results
+  - Columns: Variable, Coef (no FE), SE (no FE), Coef (FE), SE (FE), t-stat, p-value
+  - Rows: All variables + constant
+- **Sheet 2: Model Statistics** - R², N, observations
+- **Sheet 3: Clustered SE Comparison** - With/without clustering
+
+**Key regression objects to understand:**
+```python
+# Fixed effects implementation
+city_dummies = pd.get_dummies(df['city_name'], prefix='city', drop_first=True)
+year_dummies = pd.get_dummies(df['year'], prefix='year', drop_first=True)
+
+# Clustering by city (216 clusters)
+clusters = df['city_name']
+# Calculate cluster-robust variance matrix
+```
+
+**Interpreting clustered vs. non-clustered SE:**
+- Non-clustered: Standard OLS assumption (i.i.d. errors)
+- Clustered: Allows serial correlation within cities over time
+- For panel data, **clustered SE is the correct standard**
+- If clustered SE >> non-clustered SE, indicates within-city correlation
+
+## Research Workflow and Dependencies
+
+### Analysis Pipeline (Recommended Order)
+1. **Data preparation** → `总数据集_2007-2023_最终回归版.xlsx`
+2. **Descriptive statistics** → `描述性统计表_最终回归版.xlsx`
+3. **Baseline DID regression** → `基准回归结果表.xlsx`
+4. **PSM sample selection** → `倾向得分匹配_匹配后数据集.xlsx`
+5. **PSM-DID regression** → (run same model on matched sample)
+6. **Parallel trends test** → Event study with leads/lags
+7. **Robustness tests** → Placebo, exclusions, alternative specs
+8. **Heterogeneity analysis** → By batch, region, city size
+9. **Mechanism tests** → Mediation analysis
+
+### Script Dependencies
+**Bottom-up workflow** (scripts depend on outputs from previous steps):
+```
+Raw data → merge scripts → cleaning scripts → variable construction
+→ transformation → regression → robustness testing
+```
+
+**Critical dependencies:**
+- All regression scripts require `总数据集_2007-2023_最终回归版.xlsx`
+- PSM script requires final regression dataset (5 covariates already log-transformed)
+- Any new variables must be added BEFORE transformation/winsorization
+- Always preserve the "final regression version" as the canonical source
+
+### Package Dependencies
+```
+pandas==2.0.3        # Data manipulation
+numpy==1.24.4        # Numerical operations
+openpyxl             # Excel I/O
+scipy               # Statistical distributions (t, f)
+sklearn             # LogisticRegression (PSM only)
+```
+
+**NOT installed:**
+- `linearmodels` - Use manual LSDV implementation instead
+- `statsmodels` - Use scipy.stats + manual calculations

@@ -231,20 +231,21 @@ class PropensityScoreMatcher:
                 if min_diff <= self.caliper:
                     control_idx = control_indices[min_diff_idx]
                     matched_pairs.append((treat_idx, control_idx, min_diff))
-                else:
-                    # 超出卡尺, 保留但标记
-                    control_idx = control_indices[min_diff_idx]
-                    matched_pairs.append((treat_idx, control_idx, min_diff))
+                # 超出卡尺的样本不匹配（被剔除）
 
             # 统计匹配质量
             diffs = [pair[2] for pair in matched_pairs]
             n_within_caliper = sum(1 for d in diffs if d <= self.caliper)
+            n_dropped = len(treat_indices) - len(matched_pairs)
 
             print(f"  匹配结果:")
+            print(f"    处理组总数: {len(treat_indices)}")
             print(f"    成功匹配: {len(matched_pairs)} 对")
-            print(f"    卡尺内: {n_within_caliper} 对 ({n_within_caliper/len(matched_pairs)*100:.1f}%)")
+            print(f"    剔除样本: {n_dropped} 个 ({n_dropped/len(treat_indices)*100:.1f}%)")
+            print(f"    卡尺内比例: {n_within_caliper/len(matched_pairs)*100:.1f}% (全部在卡尺内)")
             print(f"    平均PS差异: {np.mean(diffs):.4f}")
             print(f"    最大PS差异: {np.max(diffs):.4f}")
+            print(f"    最小PS差异: {np.min(diffs):.4f}")
 
             # 保存匹配的索引 (原数据中的索引)
             original_indices = year_data.index.tolist()
