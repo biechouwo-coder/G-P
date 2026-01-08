@@ -12,7 +12,7 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 **Repository:** https://github.com/biechouwo-coder/G-P.git
 
-## Current Status (January 8, 2025)
+## Current Status (January 8, 2025 - Updated)
 
 ### Completed Work
 - ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area)
@@ -23,22 +23,38 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Road area: Added prefecture-level road area variable
 - ✅ Baseline DID regression: Two-way fixed effects model completed
 - ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,672 obs × 216 cities × 24 variables, 100% complete)
-- ✅ Propensity Score Matching (PSM): Year-by-year matching with 5 covariates completed
-- ✅ Squared term: Added `ln_pop_density_squared` to test nonlinear effects of population density
+- ✅ **Propensity Score Matching (PSM)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
+- ✅ **PSM-DID regression**: Double robust estimation on matched sample completed
+- ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
+- ✅ **Secondary industry share model**: Robustness check with alternative specification
 
-### Regression Results
-- **Model (1) - No controls:** DID coefficient 0.0186* (p=0.083, significant at 10% level)
-- **Model (2) - With controls:** DID coefficient 0.0204 (p=0.459, not significant)
-- **Key finding:** Policy effect not statistically significant after clustering standard errors at city level
-- **Control variables:** ln_pgdp***, ln_pop_density***, tertiary_share***, ln_road_area*** all significant
-- **Model fit:** R² > 0.97 for both models
+### Key Research Findings
+
+**1. PSM-DID Results (Tertiary Share Model - Main Specification)**
+- DID coefficient: 0.0427 (p=0.105, not significant at 10% level)
+- Sample: 2,990 obs × 200 cities × 17 years
+- Control variables: ln_pgdp***, tertiary_share**, tertiary_share_sq***, ln_road_area** significant
+- Parallel trends: ✓ PASSED (pre-period slope p=0.4082)
+- **Long-term effect (t≥+5)**: +5.96% increase in emissions (p=0.081*, marginally significant)
+
+**2. Secondary Industry Share Model (Robustness Check)**
+- DID coefficient: 0.0332 (p=0.200, less significant than tertiary model)
+- Secondary share variables not significant (possible multicollinearity)
+- Parallel trends: ✓ PASSED (pre-period slope p=0.3097)
+- Long-term effect (t≥+5): +5.03% (p=0.142, not significant)
+
+**3. Policy Interpretation**
+- Short-term (0-2 years): No significant effect
+- Medium-term (3-4 years): Positive trend but not significant
+- **Long-term (≥5 years): Policy may INCREASE emissions by ~6% (p<0.1)**
+- Possible mechanisms: "Pollution haven effect" or "Infrastructure expansion effect"
+- **Conclusion**: Low-carbon pilot policies show no significant emission reduction effect; may even increase emissions in the long run
 
 ### Next Steps
-- [ ] PSM-DID regression using matched dataset
-- [ ] Parallel trends test (Event Study) - CRITICAL for DID validity
-- [ ] Robustness testing (placebo tests, exclude concurrent policies)
+- [ ] Mechanism testing (industrial structure as mediator, not control)
 - [ ] Heterogeneity analysis (by batch, region, city size)
-- [ ] Mechanism testing (industrial structure, technology innovation)
+- [ ] Additional robustness tests (placebo, exclude concurrent policies)
+- [ ] Synthetic control method as alternative identification strategy
 
 ## Data Processing Commands
 
@@ -284,7 +300,7 @@ Traditional STIRPAT: `I = P × A × T`
   - Year-by-year Logit regression (not pooled across years)
   - 1:1 nearest neighbor matching with replacement
   - Caliper: 0.05 (propensity score difference threshold)
-  - 5 covariates: ln_pgdp, ln_pop_density, tertiary_share, ln_fdi, ln_road_area
+  - 6 covariates: ln_pgdp, ln_pop_density, tertiary_share, tertiary_share_sq, ln_fdi, ln_road_area
   - Balance diagnostics using standardized bias (< 10% threshold)
   - Uses sklearn.linear_model.LogisticRegression
   - Outputs: matched dataset, balance statistics, yearly summary
@@ -295,10 +311,57 @@ Traditional STIRPAT: `I = P × A × T`
     - `check_balance()` - Standardized bias calculations
     - `generate_reports()` - Excel outputs for diagnostics
 
+**PSM-DID Analysis:**
+- `psm_did_regression.py` - **PSM-DID regression with double robust estimation**
+  - Loads `倾向得分匹配_匹配后数据集.xlsx` (2,990 obs)
+  - Two models: (1) without controls, (2) with 6 controls
+  - Double robust estimation: PSM + control variables in regression
+  - Control variables: ln_pgdp, ln_pop_density, tertiary_share, tertiary_share_sq, ln_fdi, ln_road_area
+  - Uses manual LSDV implementation for two-way fixed effects
+  - Cluster-robust standard errors at city level (200 clusters)
+  - Outputs: `PSM-DID基准回归结果表.xlsx`
+
+- `psm_did_regression_secondary.py` - **Robustness check with secondary industry share**
+  - Alternative specification using secondary_share instead of tertiary_share
+  - Loads data from `二产占比模型_分析结果/PSM匹配后数据集_含二产占比.xlsx`
+  - Tests sensitivity to industry structure variable choice
+  - Outputs: `PSM-DID回归结果表_二产占比.xlsx`
+
+**Event Study (Parallel Trends Test):**
+- `event_study_parallel_trends.py` - **Multi-period event study for parallel trends verification**
+  - Auto-detects data source (tries secondary share, falls back to tertiary share)
+  - Calculates relative year: calendar_year - pilot_year
+  - Binning: [-5, +5] window with tails collapsed (pre_-5, post_5)
+  - Generates 11 event dummies (excludes baseline t=-1)
+  - Two-way fixed effects + clustered SE + 6 control variables
+  - Tests pre-period slope (parallel trends assumption)
+  - Outputs: event study coefficient table + visualization plot
+  - **Key pattern:** Automatically adapts control variables based on data source:
+    ```python
+    if use_secondary:
+        control_vars = [ln_pgdp, ln_pop_density, secondary_share,
+                       secondary_share_sq, ln_fdi, ln_road_area]
+    else:
+        control_vars = [ln_pgdp, ln_pop_density, tertiary_share,
+                       tertiary_share_sq, ln_fdi, ln_road_area]
+    ```
+
+**Data Extraction (Secondary Industry Share):**
+- `add_real_secondary_share.py` - **Extract secondary industry share from original source**
+  - Reads `原始数据/2000-2023地级市产业结构 .xlsx` (sheet index 1)
+  - Extracts column 10: 第二产业占GDP比重
+  - Merges on city_code + year
+  - Converts from percentage to ratio if max value > 1
+  - Cleans anomalies: removes values < 0 or > 1
+  - Creates squared term: secondary_share_sq
+  - Outputs: `二产占比模型_分析结果/PSM匹配后数据集_含二产占比.xlsx`
+
 ### Documentation
 - `数据清理计划.md` - Complete data cleaning log (Chinese, detailed steps, 17 sections)
 - `实验思路md` - Research design and methodology (Chinese, 408 lines)
 - `基础回归记录表.md` - **Baseline DID regression documentation** (model specification, results, interpretation)
+- `PSM-DID回归分析记录.md` - **PSM-DID analysis with event study results** (main specification)
+- `二产占比模型_分析结果/二产vs三产对比分析.md` - **Model comparison documentation** (robustness check)
 - `README.md` - Project overview (bilingual)
 - `CLAUDE.md` - This file (guidance for AI assistants)
 
@@ -518,6 +581,24 @@ See `实验思路md` (408 lines) for:
    - **NOT installed:** linearmodels (use manual LSDV implementation instead)
    - If network unavailable, rely on manual OLS implementation (see `did_baseline_regression.py`)
 
+10. **PSM Analysis Requirements**
+    - Year-by-year Logit regression (NOT pooled across years)
+    - 1:1 nearest neighbor matching WITH replacement
+    - Caliper: 0.05 (maximum propensity score difference threshold)
+    - Covariates: ln_pgdp, ln_pop_density, tertiary_share, tertiary_share_sq, ln_fdi, ln_road_area
+    - Balance criterion: standardized bias < 10% for all covariates
+    - McFadden's pseudo R² should be in range [0, 1] (typically 0.06-0.11)
+    - Critical bug: Ensure caliper logic actually EXCEEDS samples beyond threshold (lines 234-237 in `propensity_score_matching.py`)
+
+11. **Event Study (Parallel Trends Test) Requirements**
+    - Calculate relative year: calendar_year - pilot_year
+    - Implement binning: [-5, +5] window with tails collapsed
+    - Exclude baseline period t=-1 from regression (set coefficient to 0)
+    - Use same control variables as PSM-DID regression
+    - Test pre-period slope for significance (should be p > 0.1 for parallel trends)
+    - Long-term effect defined as t≥+5 (policy implementation 5+ years ago)
+    - Visualization: coefficient plot with 95% CI, vertical line at policy implementation
+
 
 ## Regression Analysis Notes
 
@@ -600,23 +681,25 @@ clusters = df['city_name']
 1. **Data preparation** → `总数据集_2007-2023_最终回归版.xlsx`
 2. **Descriptive statistics** → `描述性统计表_最终回归版.xlsx`
 3. **Baseline DID regression** → `基准回归结果表.xlsx`
-4. **PSM sample selection** → `倾向得分匹配_匹配后数据集.xlsx`
-5. **PSM-DID regression** → (run same model on matched sample)
-6. **Parallel trends test** → Event study with leads/lags
-7. **Robustness tests** → Placebo, exclusions, alternative specs
+4. **PSM sample selection** → `倾向得分匹配_匹配后数据集.xlsx` (2,990 obs)
+5. **PSM-DID regression** → `PSM-DID基准回归结果表.xlsx`
+6. **Parallel trends test** → Event study results table + visualization
+7. **Robustness tests** → Secondary industry share model (`二产占比模型_分析结果/`)
 8. **Heterogeneity analysis** → By batch, region, city size
-9. **Mechanism tests** → Mediation analysis
+9. **Mechanism tests** → Mediation analysis (industrial structure as mediator)
 
 ### Script Dependencies
 **Bottom-up workflow** (scripts depend on outputs from previous steps):
 ```
 Raw data → merge scripts → cleaning scripts → variable construction
-→ transformation → regression → robustness testing
+→ transformation → regression → PSM → PSM-DID → Event Study → Robustness checks
 ```
 
 **Critical dependencies:**
 - All regression scripts require `总数据集_2007-2023_最终回归版.xlsx`
-- PSM script requires final regression dataset (5 covariates already log-transformed)
+- PSM script requires final regression dataset (6 covariates already log-transformed)
+- PSM-DID regression script requires `倾向得分匹配_匹配后数据集.xlsx`
+- Event study script auto-detects data source (tries secondary, falls back to tertiary)
 - Any new variables must be added BEFORE transformation/winsorization
 - Always preserve the "final regression version" as the canonical source
 
@@ -627,8 +710,189 @@ numpy==1.24.4        # Numerical operations
 openpyxl             # Excel I/O
 scipy               # Statistical distributions (t, f)
 sklearn             # LogisticRegression (PSM only)
+matplotlib          # Visualization (Event Study plots)
 ```
 
 **NOT installed:**
 - `linearmodels` - Use manual LSDV implementation instead
 - `statsmodels` - Use scipy.stats + manual calculations
+
+## Code Architecture Patterns
+
+### Pattern 1: Manual OLS with Clustered Standard Errors
+All regression scripts use this pattern (no linearmodels dependency):
+
+```python
+def ols_regression_clustered(y, X, cluster_var, df):
+    # Add constant
+    X = np.column_stack([np.ones(len(y)), X])
+
+    # OLS estimation: beta = (X'X)^(-1)X'y
+    XtX = np.dot(X.T, X)
+    Xty = np.dot(X.T, y)
+    beta = np.linalg.solve(XtX, Xty)
+
+    # Residuals
+    residuals = y - np.dot(X, beta)
+
+    # Cluster-robust variance (sandwich estimator)
+    clusters = df[cluster_var].values
+    unique_clusters = np.unique(clusters)
+
+    meat = np.zeros((k, k))
+    for cluster in unique_clusters:
+        mask = clusters == cluster
+        X_cluster = X[mask]
+        u_cluster = residuals[mask].reshape(-1, 1)
+        meat += np.dot(X_cluster.T, u_cluster).dot(u_cluster.T).dot(X_cluster)
+
+    # Small-sample correction
+    n_clusters = len(unique_clusters)
+    correction = (n_clusters / (n_clusters - 1)) * ((n - 1) / (n - k))
+    vcov_cluster = correction * np.linalg.inv(XtX).dot(meat).dot(np.linalg.inv(XtX))
+    se_cluster = np.sqrt(np.diag(vcov_cluster))
+
+    return {'coefficients': beta, 'std_errors': se_cluster, ...}
+```
+
+### Pattern 2: Two-Way Fixed Effects via LSDV
+```python
+# Create city and year dummies
+city_dummies = pd.get_dummies(df['city_entity'], prefix='city', drop_first=True)
+year_dummies = pd.get_dummies(df['year_entity'], prefix='year', drop_first=True)
+
+# Design matrix: variables + city FE + year FE
+X = np.column_stack([
+    df[did_var].values,
+    *[df[var].values for var in control_vars],
+    city_dummies.values,
+    year_dummies.values
+])
+```
+
+### Pattern 3: Event Study with Binning
+```python
+# Calculate relative year
+df['relative_year'] = df.apply(
+    lambda row: (row['year'] - row['pilot_year']) if row['treat'] == 1 else 0,
+    axis=1
+)
+
+# Binning: collapse tails into [-5, +5] window
+def bin_relative_year(rel_year, treat_status):
+    if treat_status == 0:
+        return 'control'
+    elif rel_year <= -5:
+        return 'pre_-5'
+    elif rel_year >= 5:
+        return 'post_5'
+    else:
+        return str(rel_year)  # -4 to +4
+
+df['binned_relative_year'] = df.apply(
+    lambda row: bin_relative_year(row['relative_year'], row['treat']),
+    axis=1
+)
+
+# Create event dummies (exclude baseline t=-1)
+event_dummies = pd.get_dummies(df['binned_relative_year'], prefix='event')
+event_vars_for_regression = [var for var in event_dummies.columns if var != 'event_-1']
+```
+
+### Pattern 4: Auto-Adapt Control Variables
+The event study script demonstrates flexible control variable selection:
+
+```python
+import os
+data_file = '二产占比模型_分析结果/PSM匹配后数据集_含二产占比.xlsx'
+if os.path.exists(data_file):
+    df = pd.read_excel(data_file)
+    use_secondary = True
+else:
+    df = pd.read_excel('倾向得分匹配_匹配后数据集.xlsx')
+    use_secondary = False
+
+# Adapt control variables based on data source
+if use_secondary:
+    control_vars = [ln_pgdp, ln_pop_density, secondary_share,
+                   secondary_share_sq, ln_fdi, ln_road_area]
+else:
+    control_vars = [ln_pgdp, ln_pop_density, tertiary_share,
+                   tertiary_share_sq, ln_fdi, ln_road_area]
+```
+
+This allows the same script to run on different model specifications without modification.
+
+## Key Analysis Results Reference
+
+### PSM-DID Main Specification (Tertiary Share)
+- **DID coefficient**: 0.0427 (p=0.105, not significant)
+- **Interpretation**: No evidence that low-carbon pilot policy reduced emissions
+- **Control variables**:
+  - ln_pgdp: -0.3657*** (higher GDP → lower emissions, EKC confirmed)
+  - tertiary_share: 1.7389** (positive effect, but with squared term creates U-curve)
+  - tertiary_share_sq: -2.6387*** (inflection point at 32.95%)
+  - ln_road_area: 0.1031** (more roads → higher emissions, unexpected)
+- **Parallel trends**: ✓ PASSED (pre-period slope p=0.4082)
+- **Long-term effect (t≥+5)**: +5.96% (p=0.081*, marginally significant)
+
+### Event Study Dynamic Effects
+- t=0 (policy year): -0.0028 (p=0.805)
+- t=1: 0.0069 (p=0.697)
+- t=2: 0.0361 (p=0.112)
+- t=3: 0.0296 (p=0.207)
+- t=4: 0.0189 (p=0.486)
+- t≥+5: 0.0596* (p=0.081) ← **Policy increases emissions in long run**
+
+**Conclusion**: Policy shows no short-term benefit, may increase emissions by ~6% after 5+ years.
+
+### Robustness Check (Secondary Share Model)
+- **DID coefficient**: 0.0332 (p=0.200, even less significant)
+- **Secondary share variables**: Both NOT significant (possible multicollinearity)
+- **Parallel trends**: ✓ PASSED (pre-period slope p=0.3097)
+- **Long-term effect (t≥+5)**: 0.0503 (p=0.142, not significant)
+
+**Conclusion**: Results robust - policy effect remains insignificant across specifications.
+
+## Common Issues and Solutions
+
+### Issue 1: PSM Caliper Logic Bug
+**Problem**: Lines 234-237 in `propensity_score_matching.py` had else clause that still added samples beyond caliper threshold
+**Impact**: 100% match rate (all samples matched regardless of PS difference)
+**Solution**: Removed erroneous else clause, now properly excludes samples with PS difference > 0.05
+**Result**: Matched sample reduced from 3,162 to 2,990 obs (5.4% reduction)
+
+### Issue 2: McFadden R² Calculation Error
+**Problem**: Null model log-likelihood used wrong formula
+**Impact**: R² values > 1 (statistically impossible), e.g., 1.1344
+**Solution**: Correct formula:
+```python
+p_bar = y.mean()  # Treatment group proportion
+loglike_null = -2 * (n_treat * np.log(p_bar) + n_control * np.log(1 - p_bar))
+loglike_model = -2 * np.sum(y * np.log(pscores) + (1-y) * np.log(1-pscores))
+mcfadden_r2 = 1 - loglike_model / loglike_null
+```
+**Result**: R² now in valid range [0,1], typically 0.06-0.11 (8-11% explanatory power)
+
+### Issue 3: Event Study Visualization Encoding
+**Problem**: Unicode characters (², ³, ✓) cause UnicodeEncodeError in Windows console
+**Solution**: Replace with ASCII equivalents (R2, squared, v) or use English in print statements
+**Pattern**: Always avoid special Unicode in console output, use [OK], [WARNING], [INFO] instead of emojis
+
+### Issue 4: Column Position-Based Extraction
+**Problem**: Chinese column names cause encoding errors in Windows GBK console
+**Solution**: Always use iloc with column indices, not column names:
+```python
+# BAD: df[['年份', '地区名称', '第二产业占GDP比重']]
+# GOOD: industry_df.iloc[:, [0, 1, 2, 10]]  # By position
+```
+
+## Git Commit History (Recent Key Revisions)
+
+- `42bdf83` - Add secondary industry share model comparison with tertiary share (Jan 8)
+- `b3a617e` - Add parallel trends test (Event Study) for PSM-DID analysis (Jan 8)
+- `b231cdb` - Add PSM-DID baseline regression analysis with double robust estimation (Jan 8)
+- `3458aef` - Revert PSM caliper from 0.02 back to 0.05 (Jan 8)
+- `bf18a0b` - Tighten PSM caliper from 0.05 to 0.02 (Jan 8)
+- `1e22d99` - Fix McFadden's R² calculation in PSM Logit regression (Jan 8)
+- `060a073` - Fix critical PSM caliper logic error and enhance documentation (Jan 8)
