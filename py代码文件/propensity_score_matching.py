@@ -424,11 +424,12 @@ def main():
 
     # 定义匹配协变量 (按照研究设计)
     covariates = [
-        'ln_pgdp',          # 经济发展水平 (人均GDP, 对数)
-        'ln_pop_density',   # 人口集聚程度 (人口密度, 对数) - 核心变量
-        'tertiary_share',   # 第三产业占比 (产业结构)
-        'ln_fdi',           # 外商直接投资 (对外开放度, 对数)
-        'ln_road_area'      # 人均道路面积 (基础设施, 对数)
+        'ln_pgdp',            # 经济发展水平 (人均GDP, 对数)
+        'ln_pop_density',     # 人口集聚程度 (人口密度, 对数) - 核心变量
+        'tertiary_share',     # 第三产业占比 (产业结构)
+        'tertiary_share_sq',  # 第三产业占比平方项 (产业结构非线性效应)
+        'ln_fdi',             # 外商直接投资 (对外开放度, 对数)
+        'ln_road_area'        # 人均道路面积 (基础设施, 对数)
     ]
 
     print("\n匹配协变量:")
