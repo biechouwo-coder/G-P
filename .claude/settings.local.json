@@ -24,7 +24,9 @@
       "Bash(findstr:*)",
       "Bash(dir:*)",
       "Bash(move *.py py代码文件)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(rm:*)",
+      "Bash(move:*)"
     ]
   }
 }
