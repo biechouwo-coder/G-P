@@ -119,6 +119,13 @@ for city_name in batch_2_cities:
     if city_name in df['city_name'].values:
         # 明确名单优先，直接覆盖省级试点赋值
         city_to_pilot_year[city_name] = 2013
+
+# 【优先处理】第三批明确城市（2017年）
+for city_name in batch_3_cities:
+    if city_name in df['city_name'].values:
+        # 【关键修复】只赋值给未赋值的城市，避免覆盖第一批或第二批
+        if city_name not in city_to_pilot_year:
+            city_to_pilot_year[city_name] = 2017
 ```
 
 #### 步骤3: 省级试点覆盖（后处理）
@@ -144,16 +151,18 @@ for province_code in batch_1_provinces:
 | 城市数 | 215（已剔除普洱市） |
 | 处理组城市数 | 92 |
 | 对照组城市数 | 123 |
-| DID=1观测数 | 1,006 (27.52%) |
+| DID=1观测数 | 1,030 (28.18%) |
 
 ### 4.2 批次分布
 
 | 批次 | 年份 | 城市数 | 说明 |
 |------|------|--------|------|
 | 第一批 | 2010 | 42 | 省级试点覆盖（广东、湖北、陕西、云南） |
-| 第二批 | 2013 | 17 | **明确名单优先**（含武汉、广州、昆明） |
-| 第三批 | 2017 | 33 | 补全遗漏城市 |
+| 第二批 | 2013 | 23 | **明确名单优先**（含武汉、广州、昆明） |
+| 第三批 | 2017 | 27 | 补全遗漏城市（不覆盖前两批） |
 | **总计** | - | **92** | - |
+
+**说明**：第三批城市处理时增加了"是否已赋值"判断，避免错误覆盖第一批或第二批已赋值的城市。
 
 ### 4.3 关键城市验证
 
@@ -280,6 +289,7 @@ for province_code in batch_1_provinces:
 2. ✅ **明确名单优先** - 武汉、广州、昆明使用第二批年份
 3. ✅ **恢复原设定** - 第二批年份2012改回2013
 4. ✅ **补全遗漏城市** - 保留第三批新增城市（虽然数据集中没有拉萨、伊宁、和田）
+5. ✅ **修复第三批逻辑** - 增加已赋值判断，避免错误覆盖前两批（关键修复）
 
 ### 9.2 关键代码模式
 ```python
@@ -288,11 +298,21 @@ for province_code in batch_1_provinces:
 df = df[df['city_name'] != '普洱市'].copy()
 
 # 2. 优先处理明确名单
+for city_name in batch_1_cities:
+    if city_name in df['city_name'].values:
+        city_to_pilot_year[city_name] = 2010
+
 for city_name in batch_2_cities:
     if city_name in df['city_name'].values:
         city_to_pilot_year[city_name] = 2013  # 直接赋值
 
-# 3. 后处理省级试点
+# 3. 【关键修复】第三批检查是否已赋值
+for city_name in batch_3_cities:
+    if city_name in df['city_name'].values:
+        if city_name not in city_to_pilot_year:  # 避免覆盖前两批
+            city_to_pilot_year[city_name] = 2017
+
+# 4. 后处理省级试点
 for province_code in batch_1_provinces:
     for city_name in cities_in_province:
         if city_name not in city_to_pilot_year:  # 关键检查

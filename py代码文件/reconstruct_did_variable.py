@@ -172,9 +172,12 @@ print(f"  [注意] 武汉、广州、昆明等将设为2013年（覆盖省级试
 # 处理第三批明确城市（2017年）
 for city_name in batch_3_cities:
     if city_name in df['city_name'].values:
-        city_to_pilot_year[city_name] = 2017
+        # 【关键修复】只赋值给未赋值的城市，避免覆盖第一批或第二批
+        if city_name not in city_to_pilot_year:
+            city_to_pilot_year[city_name] = 2017
 
 print(f"  第三批明确城市: {len([c for c in batch_3_cities if c in df['city_name'].values])}个")
+print(f"  [注意] 只赋值给未赋值的城市，避免覆盖第一批或第二批")
 
 print(f"\n  -> 明确名单处理后: {len(city_to_pilot_year)}个城市已赋值")
 
