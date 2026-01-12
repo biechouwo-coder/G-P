@@ -26,8 +26,8 @@ print(f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 文件路径
 FDI_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\原始数据\1996-2023年地级市外商直接投资FDI.xlsx")
-MAIN_DATA = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_最终版.xlsx")
-OUTPUT_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_含FDI.xlsx")
+MAIN_DATA = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_含产业升级变量.xlsx")
+OUTPUT_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_修正FDI.xlsx")
 
 # ================================
 # 步骤1：读取FDI原始数据
@@ -180,19 +180,60 @@ print(f"  缺失值数量: {df_fdi_clean['fdi'].isna().sum()}")
 # ================================
 print("\n[步骤5/6] 计算FDI开放度（FDI/GDP）...")
 
-# 读取主数据集（包含GDP数据）
-df_main = pd.read_excel(MAIN_DATA)
+# 直接从原始GDP文件读取名义GDP（不再使用实际GDP×平减指数的方法）
+GDP_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\原始数据\296个地级市GDP相关数据（以2000年为基期）.xlsx")
+df_gdp_raw = pd.read_excel(GDP_FILE)
 
-print(f"[OK] 主数据集维度: {df_main.shape}")
-print(f"  列名: {list(df_main.columns)}")
+# GDP文件结构（按列位置）：
+# 列0: 省份, 列1: 城市, 列2: 年份, 列3: 名义GDP, 列4: GDP指数, 列5: 实际GDP, 列6: GDP平减指数
+df_gdp_nominal = df_gdp_raw.iloc[:, [1, 2, 3]].copy()
+df_gdp_nominal.columns = ['city_name', 'year', 'gdp_nominal']
+df_gdp_nominal['year'] = pd.to_numeric(df_gdp_nominal['year'], errors='coerce')
 
-# 选择需要的列
-df_main_subset = df_main[['city_name', 'year', 'gdp_real', 'gdp_deflator']].copy()
+# 清洗城市名称（与FDI数据保持一致）
+def clean_city_name_for_gdp(name):
+    """清洗城市名称：添加"市"后缀，去除特殊字符，处理城市更名"""
+    if pd.isna(name):
+        return name
 
-# 合并FDI和GDP数据
+    name = str(name).strip()
+
+    # 去除零宽空格等特殊字符
+    name = name.replace('\u200b', '').replace('\u200c', '').replace('\u200d', '')
+    name = name.replace('\xa0', ' ').strip()
+
+    # 处理城市更名（统一使用新名称）
+    city_rename_map = {
+        '襄樊市': '襄阳市',  # 2010年更名
+        '思茅市': '普洱市',   # 2007年更名
+        '襄樊': '襄阳市',
+        '思茅': '普洱市'
+    }
+
+    if name in city_rename_map:
+        name = city_rename_map[name]
+
+    # 如果不以"市"结尾，且不是特殊的地区类型，添加"市"
+    if not name.endswith(('市', '地区', '自治区', '自治州', '盟')):
+        # 排除直辖市（北京、上海、天津、重庆）—它们需要加"市"
+        if name in ['北京', '上海', '天津', '重庆']:
+            name = name + '市'
+        elif not name.endswith('市'):  # 其他非直辖市也加"市"
+            name = name + '市'
+
+    return name
+
+df_gdp_nominal['city_name'] = df_gdp_nominal['city_name'].apply(clean_city_name_for_gdp)
+
+print(f"[OK] 名义GDP数据维度: {df_gdp_nominal.shape}")
+print(f"  年份范围: {df_gdp_nominal['year'].min()} - {df_gdp_nominal['year'].max()}")
+print(f"  城市数量: {df_gdp_nominal['city_name'].nunique()}")
+print(f"  名义GDP范围: {df_gdp_nominal['gdp_nominal'].min():.2f} - {df_gdp_nominal['gdp_nominal'].max():.2f} 亿元")
+
+# 合并FDI和名义GDP数据
 df_merged = pd.merge(
     df_fdi_clean,
-    df_main_subset,
+    df_gdp_nominal,
     on=['city_name', 'year'],
     how='inner'
 )
@@ -200,7 +241,7 @@ df_merged = pd.merge(
 print(f"\n[OK] 合并后数据维度: {df_merged.shape}")
 
 # ================================
-# 计算FDI开放度（修正版）
+# 计算FDI开放度（修正版 - 直接使用名义GDP）
 # ================================
 # 年平均汇率字典（人民币/美元）
 exchange_rates = {
@@ -214,20 +255,20 @@ exchange_rates = {
 # 为每个年份匹配对应汇率
 df_merged['exchange_rate'] = df_merged['year'].map(exchange_rates)
 
-# 计算名义GDP（从实际GDP还原）
-# 名义GDP = 实际GDP × GDP平减指数
-df_merged['gdp_nominal'] = df_merged['gdp_real'] * df_merged['gdp_deflator']
+# 名义GDP已直接从原始文件读取，无需计算
+# 之前的错误做法：名义GDP = 实际GDP × GDP平减指数
 
 # 计算FDI开放度
 # FDI单位：百万美元
-# GDP单位：亿元（名义值）
+# GDP单位：亿元（名义值，直接从原始文件读取）
 # 转换：百万美元 × 汇率 / 100 = 亿元
 df_merged['fdi_rmb'] = df_merged['fdi'] * df_merged['exchange_rate'] / 100  # 百万美元 -> 亿元
 df_merged['fdi_openness'] = df_merged['fdi_rmb'] / df_merged['gdp_nominal']  # 使用名义GDP
 
-print(f"\n[OK] FDI开放度计算完成（使用名义GDP + 年度汇率）")
+print(f"\n[OK] FDI开放度计算完成（直接使用名义GDP + 年度汇率）")
 print(f"  汇率范围: {df_merged['exchange_rate'].min():.4f} - {df_merged['exchange_rate'].max():.4f}")
 print(f"  名义GDP范围: {df_merged['gdp_nominal'].min():.2f} - {df_merged['gdp_nominal'].max():.2f} 亿元")
+print(f"  说明: 名义GDP直接来源于GDP原始文件（列3），未使用实际GDP×平减指数计算")
 
 print(f"\n[OK] FDI开放度统计:")
 print(df_merged['fdi_openness'].describe())
@@ -259,7 +300,13 @@ print("\n[步骤6/6] 合并到主数据集...")
 # 读取完整主数据集
 df_main_full = pd.read_excel(MAIN_DATA)
 
-# 外合并
+# 删除旧的fdi和fdi_openness列（如果存在）
+if 'fdi' in df_main_full.columns:
+    df_main_full = df_main_full.drop(columns=['fdi'])
+if 'fdi_openness' in df_main_full.columns:
+    df_main_full = df_main_full.drop(columns=['fdi_openness'])
+
+# 外合并（使用新的修正后的FDI数据）
 df_main_with_fdi = pd.merge(
     df_main_full,
     df_final,
