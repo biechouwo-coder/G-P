@@ -12,21 +12,26 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 **Repository:** https://github.com/biechouwo-coder/G-P.git
 
-## Current Status (January 8, 2025 - Updated)
+## Current Status (January 12, 2025 - Updated)
 
 ### Completed Work
-- ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area)
+- ✅ Data collection: 6 datasets merged (population density, GDP, carbon emissions, industrial structure, FDI, road area, exchange rates)
 - ✅ Data cleaning: Removed outliers, handled missing values, ensured data quality
 - ✅ Variable transformation: All continuous variables log-transformed and winsorized (1% and 99% percentiles)
 - ✅ DID variable construction: Three-batch pilot policy (2010, 2012, 2017) implemented
 - ✅ FDI processing: Added FDI openness ratio with year-specific exchange rates
+- ✅ Foreign investment level: Added `外商投资水平` variable (FDI/GDP ratio using annual exchange rates)
 - ✅ Road area: Added prefecture-level road area variable
+- ✅ Industrial upgrading: Added `industrial_advanced` (tertiary/secondary ratio) as alternative specification
+- ✅ Exchange rate data: Added `原始数据/汇率.xlsx` (2007-2023 annual USD/RMB rates)
 - ✅ Baseline DID regression: Two-way fixed effects model completed
-- ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,672 obs × 216 cities × 24 variables, 100% complete)
-- ✅ **Propensity Score Matching (PSM)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
-- ✅ **PSM-DID regression**: Double robust estimation on matched sample completed
+- ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,655 obs × 215 cities × 25 variables, 100% complete)
+- ✅ **Propensity Score Matching (PSM)**: Year-by-year matching with 5 covariates (caliper=0.02) - **2,830 obs matched**
+- ✅ **PSM-DID regression (Alternative specification)**: Double robust estimation using `industrial_advanced` - **2,830 obs**
+- ✅ **PSM-DID regression (Tertiary share model)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
 - ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
 - ✅ **Secondary industry share model**: Robustness check with alternative specification
+- ✅ **Data quality fixes**: Corrected Shanghai FDI data error (restored original values 2011-2023)
 
 ### Key Research Findings
 
@@ -124,9 +129,10 @@ git push
 | `post` | Policy | Post-policy period indicator | - | 1 if year ≥ pilot_year |
 | `pilot_year` | Policy | Pilot implementation year | - | 2010, 2012, or 2017 |
 | `fdi` | Control | Foreign direct investment | 百万美元 | Original FDI data |
-| `fdi_openness` | Control | FDI/GDP ratio | 比例 | Uses nominal GDP + year-specific exchange rates |
+| `外商投资水平` | Control | FDI/GDP ratio | 比例 | Uses nominal GDP + year-specific exchange rates, calculated as (FDI USD × exchange rate / 100) / nominal GDP |
 | `road_area` | Control | Road area per capita | 平方米/人 | Prefecture-level data |
 | `ln_road_area` | Control | Log road area per capita | - | ln(road_area + 1) |
+| `industrial_advanced` | Alternative | Industrial upgrading ratio | 比例 | tertiary/secondary (三产/二产比值), used in alternative specification |
 
 ### Data Merge Strategy
 
@@ -240,6 +246,8 @@ Traditional STIRPAT: `I = P × A × T`
 - `原始数据/2000-2023地级市产业结构 .xlsx` - Industrial structure
 - `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` - Foreign direct investment
 - `原始数据/各省+地级市+县级市人均道路面积.xlsx` - Road area (Sheet 1: prefecture-level)
+- `原始数据/汇率.xlsx` - Exchange rates (2007-2023, USD/RMB annual average)
+- `原始数据/试点城市名单.xlsx` - List of all pilot cities with implementation years
 
 ### Processed Data
 - `总数据集_2007-2023_最终回归版.xlsx` - **RECOMMENDED FOR REGRESSION** (3,672 obs × 24 variables, 100% complete, log-transformed and winsorized)
