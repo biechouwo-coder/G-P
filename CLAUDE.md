@@ -19,19 +19,21 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Data cleaning: Removed outliers, handled missing values, ensured data quality
 - ✅ Variable transformation: All continuous variables log-transformed and winsorized (1% and 99% percentiles)
 - ✅ DID variable construction: Three-batch pilot policy (2010, 2012, 2017) implemented
-- ✅ FDI processing: Added FDI openness ratio with year-specific exchange rates
+- ✅ FDI processing: Added FDI openness ratio with year-specific exchange rates using **nominal GDP from source**
 - ✅ Foreign investment level: Added `外商投资水平` variable (FDI/GDP ratio using annual exchange rates)
+- ✅ FDI interpolation: Comprehensive linear interpolation (including endpoints) - **0 missing FDI values**
 - ✅ Road area: Added prefecture-level road area variable
 - ✅ Industrial upgrading: Added `industrial_advanced` (tertiary/secondary ratio) as alternative specification
 - ✅ Exchange rate data: Added `原始数据/汇率.xlsx` (2007-2023 annual USD/RMB rates)
 - ✅ Baseline DID regression: Two-way fixed effects model completed
-- ✅ Final dataset: `总数据集_2007-2023_最终回归版.xlsx` (3,655 obs × 215 cities × 25 variables, 100% complete)
+- ✅ Final dataset: `总数据集_2007-2023_完整版_无缺失FDI.xlsx` (4,819 obs × 285 cities × 26 variables)
 - ✅ **Propensity Score Matching (PSM)**: Year-by-year matching with 5 covariates (caliper=0.02) - **2,830 obs matched**
 - ✅ **PSM-DID regression (Alternative specification)**: Double robust estimation using `industrial_advanced` - **2,830 obs**
 - ✅ **PSM-DID regression (Tertiary share model)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
 - ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
 - ✅ **Secondary industry share model**: Robustness check with alternative specification
 - ✅ **Data quality fixes**: Corrected Shanghai FDI data error (restored original values 2011-2023)
+- ✅ **Sanya FDI anomaly analysis**: Documented 86.5% drop in 2017, diagnostic tools created
 
 ### Key Research Findings
 
@@ -98,15 +100,21 @@ git push
 ## Research Data Architecture
 
 ### Final Dataset
-**File:** `总数据集_2007-2023_完整版.xlsx`
-- **Observations:** 3,672 city-year pairs
-- **Cities:** 216 prefecture-level cities
+**Recommended File:** `总数据集_2007-2023_完整版_无缺失FDI.xlsx`
+- **Observations:** 4,819 city-year pairs
+- **Cities:** 285 prefecture-level cities
 - **Years:** 2007-2023 (17 years)
-- **Variables:** 19 (100% complete, no missing values)
+- **Variables:** 26 (includes industrial_upgrading, fdi, fdi_openness)
+- **FDI missing:** 0 (all FDI values interpolated, fdi_openness has 4.23% missing due to GDP mismatch)
+
+**Alternative Files:**
+- `总数据集_2007-2023_修正FDI.xlsx` - Previous version with corrected FDI calculation
+- `总数据集_2007-2023_最终回归版.xlsx` - Regression-ready version (3,672 obs × 216 cities)
+- `倾向得分匹配_匹配后数据集.xlsx` - PSM-matched sample (2,990 obs × 200 cities)
 
 **Quality Checks:**
 - ✅ GDP deflator minimum: 0.8410 (>0.8, indicating consistent base year)
-- ✅ All variables: 0% missing
+- ✅ All variables: <5% missing (FDI: 0% after interpolation)
 - ✅ Outliers removed (48 cities excluded due to data quality issues)
 
 ### Key Variables
@@ -128,8 +136,9 @@ git push
 | `treat` | Policy | Treatment group indicator | - | 1 if pilot city, 0 otherwise |
 | `post` | Policy | Post-policy period indicator | - | 1 if year ≥ pilot_year |
 | `pilot_year` | Policy | Pilot implementation year | - | 2010, 2012, or 2017 |
-| `fdi` | Control | Foreign direct investment | 百万美元 | Original FDI data |
-| `外商投资水平` | Control | FDI/GDP ratio | 比例 | Uses nominal GDP + year-specific exchange rates, calculated as (FDI USD × exchange rate / 100) / nominal GDP |
+| `fdi` | Control | Foreign direct investment | 百万美元 | Original FDI data, **interpolated** (0 missing) |
+| `fdi_openness` | Control | FDI/GDP ratio | 比例 | Uses **nominal GDP from source** (not calculated), year-specific exchange rates; 4.23% missing due to GDP mismatch |
+| `外商投资水平` | Control | FDI/GDP ratio | 比例 | Legacy variable, use fdi_openness instead |
 | `road_area` | Control | Road area per capita | 平方米/人 | Prefecture-level data |
 | `ln_road_area` | Control | Log road area per capita | - | ln(road_area + 1) |
 | `industrial_advanced` | Alternative | Industrial upgrading ratio | 比例 | tertiary/secondary (三产/二产比值), used in alternative specification |
@@ -272,10 +281,26 @@ Traditional STIRPAT: `I = P × A × T`
 - `diagnose_data_issues.py` - Comprehensive diagnostic (GDP deflator anomalies, missing data)
 - `fix_data_quality_issues.py` - **MAIN SCRIPT** for final dataset generation
 - `verify_final_data.py` - Quality validation
+- `analyze_sanya_fdi_anomalies.py` - **FDI anomaly diagnostic tool**
+  - Analyzes Sanya city FDI data (2015-2023)
+  - Calculates year-over-year changes, flags anomalies (>50% change)
+  - Statistical outlier detection using IQR method
+  - Comparison with similar cities (Haikou, Xiamen, Qingdao, etc.)
+  - Outputs recommendations for handling anomalies
+- `check_sanya_fdi.py` - Quick Sanya FDI data inspection
+- `check_gdp_columns.py` - GDP file structure diagnostic
+- `check_gdp_nominal.py` - Nominal GDP data verification
 
 **Variable Construction:**
 - `construct_did_variable.py` - **Build DID policy variables** (3 batches: 2010, 2012, 2017)
-- `process_fdi_data.py` - Process FDI and calculate FDI openness ratio
+- `process_fdi_data.py` - **Process FDI with comprehensive interpolation**
+  - Reads raw FDI data from `原始数据/1996-2023年地级市外商直接投资FDI.xlsx`
+  - Reads nominal GDP directly from `原始数据/296个地级市GDP相关数据（以2000年为基期）.xlsx` (column 3)
+  - **Interpolation strategy**: Linear interpolation for middle gaps, forward/backward fill for endpoints
+  - Formula: `fdi_openness = (FDI_usd * exchange_rate / 100) / gdp_nominal`
+  - Output: `总数据集_2007-2023_完整版_无缺失FDI.xlsx`
+  - Excludes cities with >50% missing FDI data (21 cities)
+  - **Result**: 0 missing FDI values after interpolation
 - `add_road_area_variable.py` - Add prefecture-level road area data
 - `reconstruct_carbon_intensity.py` - Recalculate CEI with correct base period
 - `add_population_variables.py` - Add population and per capita GDP
@@ -417,12 +442,14 @@ Traditional STIRPAT: `I = P × A × T`
 
 6. **FDI Data Processing**
    - CRITICAL: Use correct unit conversion (divide by 100, not 10000)
-   - Use nominal GDP (real GDP × deflator), not real GDP
-   - Use year-specific exchange rates, not fixed rate
+   - CRITICAL: Use **nominal GDP directly from source file** (column 3 of GDP data), NOT calculated as real GDP × deflator
+   - Use year-specific exchange rates from `原始数据/汇率.xlsx`, not fixed rates
    - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
-   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values
+   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values or anomalies
    - Original FDI data source: `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` (column position-based extraction)
+   - **Interpolation**: FDI missing values filled using linear interpolation + forward/backward fill for endpoints
    - Always verify that FDI shows realistic year-to-year variation, not repeated values
+   - **Sanya FDI anomaly**: 2017 dropped 86.5% (217.79→29.30), verified as genuine data, not unit error
 
 7. **City-Level Data Granularity**
    - Always use full 6-digit city codes for matching
@@ -599,12 +626,14 @@ See `实验思路md` (408 lines) for:
 
 6. **FDI Data Processing**
    - CRITICAL: Use correct unit conversion (divide by 100, not 10000)
-   - Use nominal GDP (real GDP × deflator), not real GDP
-   - Use year-specific exchange rates, not fixed rate
+   - CRITICAL: Use **nominal GDP directly from source file** (column 3 of GDP data), NOT calculated as real GDP × deflator
+   - Use year-specific exchange rates from `原始数据/汇率.xlsx`, not fixed rates
    - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
-   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values
+   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values or anomalies
    - Original FDI data source: `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` (column position-based extraction)
+   - **Interpolation**: FDI missing values filled using linear interpolation + forward/backward fill for endpoints
    - Always verify that FDI shows realistic year-to-year variation, not repeated values
+   - **Sanya FDI anomaly**: 2017 dropped 86.5% (217.79→29.30), verified as genuine data, not unit error
 
 7. **City-Level Data Granularity**
    - Always use full 6-digit city codes for matching
@@ -943,8 +972,47 @@ mcfadden_r2 = 1 - loglike_model / loglike_null
 **Verification**: All 17 observations now have unique values (0% repetition rate)
 **Lesson**: Always verify major cities' data for unexpected constant values or abnormal patterns
 
+### Issue 6: Incorrect FDI Openness Calculation Method
+**Problem**: FDI openness originally calculated using derived nominal GDP (real GDP × deflator)
+**Root cause**: Misunderstanding of GDP data structure - nominal GDP already exists in source file
+**Impact**: Calculated fdi_openness values may differ from official statistics
+**Solution**: Read nominal GDP directly from column 3 of `原始数据/296个地级市GDP相关数据（以2000年为基期）.xlsx`
+**Formula change**:
+- Old: `fdi_openness = (FDI × rate / 100) / (gdp_real × gdp_deflator)`
+- New: `fdi_openness = (FDI × rate / 100) / gdp_nominal` (where gdp_nominal is from source column 3)
+**Lesson**: Always verify source data structure before calculating derived variables
+
+### Issue 7: FDI Missing Values Not Interpolated
+**Problem**: 483 FDI missing values (mostly middle-year gaps) were not interpolated
+**Root cause**: Interpolation function only handled middle gaps, not endpoints
+**Impact**: Reduced sample size, 4.23% fdi_openness missing rate
+**Solution**: Enhanced interpolation with forward/backward fill for endpoints:
+```python
+# Step 1: Linear interpolation for middle gaps
+group['fdi_interpolated'] = group['fdi'].interpolate(
+    method='linear',
+    limit_direction='both',
+    limit=None
+)
+# Step 2: Forward/backward fill for endpoints
+group['fdi_interpolated'] = group['fdi_interpolated'].fillna(method='bfill').fillna(method='ffill')
+```
+**Result**: 0 missing FDI values (483 values filled)
+**Lesson**: Use multiple imputation strategies to handle all missing data patterns
+
 ## Git Commit History (Recent Key Revisions)
 
+- `5cfd0c5` - Improve FDI interpolation to eliminate missing values (Jan 12)
+  - Enhanced interpolate_fdi() with forward/backward fill for endpoints
+  - All 483 missing FDI values successfully filled
+  - Output: `总数据集_2007-2023_完整版_无缺失FDI.xlsx`
+- `7e37735` - Correct FDI openness calculation to use nominal GDP directly (Jan 12)
+  - Changed from calculated nominal GDP (real × deflator) to source column 3
+  - Updated process_fdi_data.py with correct methodology
+- `64e6069` - Add Sanya FDI anomaly analysis tools (Jan 12)
+  - Created analyze_sanya_fdi_anomalies.py and check_sanya_fdi.py
+  - Documented 86.5% drop in 2017 (217.79→29.30 million USD)
+  - Statistical analysis shows value within IQR normal range nationally
 - `002e7d3` - Correct Shanghai FDI data error - restore original growing values (Jan 12)
 - `b3298f7` - Add foreign investment level variable to main dataset (Jan 12)
 - `feaf816` - Add PSM-DID regression with new control variable combination (Jan 12)
