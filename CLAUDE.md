@@ -319,6 +319,14 @@ Traditional STIRPAT: `I = P × A × T`
     - `check_balance()` - Standardized bias calculations
     - `generate_reports()` - Excel outputs for diagnostics
 
+- `psm_new_controls.py` - **Alternative PSM specification with 5 covariates**
+  - Uses `industrial_advanced` (tertiary/secondary ratio) instead of tertiary_share + tertiary_share_sq
+  - Tighter caliper: 0.02 (stricter matching for higher quality)
+  - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
+  - Matched sample: 2,830 observations (198 cities)
+  - Outputs saved to: `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/` directory
+  - All covariates satisfy balance criterion (|bias| < 10%)
+
 **PSM-DID Analysis:**
 - `psm_did_regression.py` - **PSM-DID regression with double robust estimation**
   - Loads `倾向得分匹配_匹配后数据集.xlsx` (2,990 obs)
@@ -334,6 +342,13 @@ Traditional STIRPAT: `I = P × A × T`
   - Loads data from `二产占比模型_分析结果/PSM匹配后数据集_含二产占比.xlsx`
   - Tests sensitivity to industry structure variable choice
   - Outputs: `PSM-DID回归结果表_二产占比.xlsx`
+
+- `psm_did_regression_new_controls.py` - **Alternative specification with industrial_advanced**
+  - Loads matched sample from `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM_匹配后数据集.xlsx`
+  - 5 control variables: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
+  - DID coefficient: 0.0346 (p=0.184, not significant)
+  - Results consistent with main specification - policy effect remains insignificant
+  - Outputs: `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM-DID基准回归结果表.xlsx`
 
 **Event Study (Parallel Trends Test):**
 - `event_study_parallel_trends.py` - **Multi-period event study for parallel trends verification**
@@ -405,6 +420,9 @@ Traditional STIRPAT: `I = P × A × T`
    - Use nominal GDP (real GDP × deflator), not real GDP
    - Use year-specific exchange rates, not fixed rate
    - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
+   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values
+   - Original FDI data source: `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` (column position-based extraction)
+   - Always verify that FDI shows realistic year-to-year variation, not repeated values
 
 7. **City-Level Data Granularity**
    - Always use full 6-digit city codes for matching
@@ -433,7 +451,7 @@ py py代码文件/did_baseline_regression.py
 
 ### Running Propensity Score Matching
 ```bash
-# Run PSM analysis (year-by-year matching)
+# Run PSM analysis (year-by-year matching) - Main specification
 py py代码文件/propensity_score_matching.py
 
 # Output files:
@@ -442,10 +460,26 @@ py py代码文件/propensity_score_matching.py
 # - 倾向得分匹配_年度统计.xlsx (yearly summary)
 # - 倾向得分匹配_汇总报告.xlsx (comprehensive report)
 
-# Matching specifications:
-# - 5 covariates: ln_pgdp, ln_pop_density, tertiary_share, ln_fdi, ln_road_area
+# Matching specifications (main):
+# - 6 covariates: ln_pgdp, ln_pop_density, tertiary_share, tertiary_share_sq, ln_fdi, ln_road_area
 # - Method: 1:1 nearest neighbor matching with replacement
 # - Caliper: 0.05 (maximum propensity score difference)
+# - Year-by-year estimation (17 separate Logit regressions)
+# - Balance criterion: standardized bias < 10%
+
+# Run PSM analysis - Alternative specification (industrial_advanced)
+py py代码文件/psm_new_controls.py
+
+# Output files (saved to: 人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/):
+# - PSM_匹配后数据集.xlsx (2,830 obs)
+# - PSM_平衡性检验.xlsx
+# - PSM_年度统计.xlsx
+# - PSM_汇总报告.xlsx
+
+# Matching specifications (alternative):
+# - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
+# - Method: 1:1 nearest neighbor matching with replacement
+# - Caliper: 0.02 (stricter matching for higher quality)
 # - Year-by-year estimation (17 separate Logit regressions)
 # - Balance criterion: standardized bias < 10%
 ```
@@ -568,6 +602,9 @@ See `实验思路md` (408 lines) for:
    - Use nominal GDP (real GDP × deflator), not real GDP
    - Use year-specific exchange rates, not fixed rate
    - Handle city name changes (e.g., 襄樊→襄阳, 思茅→普洱)
+   - **Data quality verification**: Check major cities (Shanghai, Beijing, Shenzhen) for constant values
+   - Original FDI data source: `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` (column position-based extraction)
+   - Always verify that FDI shows realistic year-to-year variation, not repeated values
 
 7. **City-Level Data Granularity**
    - Always use full 6-digit city codes for matching
@@ -895,8 +932,27 @@ mcfadden_r2 = 1 - loglike_model / loglike_null
 # GOOD: industry_df.iloc[:, [0, 1, 2, 10]]  # By position
 ```
 
+### Issue 5: Shanghai FDI Data Error
+**Problem**: Shanghai FDI values were constant at 11,565.46 million USD from 2011-2023
+**Root cause**: Data merging error replaced original growing trend with constant value
+**Impact**: Severely underestimated Shanghai's FDI growth and foreign investment level
+**Solution**: Restored original FDI values from source data
+**Before/After**:
+- Before: 2011-2023 all showed 11,565.46 million USD (incorrect)
+- After: 2011: 12,600.55 → 2023: 24,087.00 million USD (correct 3x growth)
+**Verification**: All 17 observations now have unique values (0% repetition rate)
+**Lesson**: Always verify major cities' data for unexpected constant values or abnormal patterns
+
 ## Git Commit History (Recent Key Revisions)
 
+- `002e7d3` - Correct Shanghai FDI data error - restore original growing values (Jan 12)
+- `b3298f7` - Add foreign investment level variable to main dataset (Jan 12)
+- `feaf816` - Add PSM-DID regression with new control variable combination (Jan 12)
+- `d051b4c` - Tighten PSM caliper from 0.05 to 0.02 for improved matching quality (Jan 12)
+- `3e0263c` - Clean up 2012-2017 robustness check files and update raw data (Jan 12)
+- `62df061` - Remove log form of industrial upgrading variable (Jan 10)
+- `cc2abb7` - Record industrial upgrading variable addition work (Jan 10)
+- `6d64ab5` - Add industrial upgrading variable to main dataset (Jan 10)
 - `42bdf83` - Add secondary industry share model comparison with tertiary share (Jan 8)
 - `b3a617e` - Add parallel trends test (Event Study) for PSM-DID analysis (Jan 8)
 - `b231cdb` - Add PSM-DID baseline regression analysis with double robust estimation (Jan 8)
