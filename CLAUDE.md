@@ -20,15 +20,18 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Variable transformation: All continuous variables log-transformed and winsorized (1% and 99% percentiles)
 - ✅ DID variable construction: Three-batch pilot policy (2010, 2012, 2017) implemented
 - ✅ FDI processing: Added FDI openness ratio with year-specific exchange rates using **nominal GDP from source**
-- ✅ Foreign investment level: Added `外商投资水平` variable (FDI/GDP ratio using annual exchange rates)
+- ✅ Foreign investment level: Added `fdi_openness` variable (FDI/GDP ratio using annual exchange rates)
 - ✅ FDI interpolation: Comprehensive linear interpolation (including endpoints) - **0 missing FDI values**
 - ✅ Road area: Added prefecture-level road area variable
 - ✅ Industrial upgrading: Added `industrial_advanced` (tertiary/secondary ratio) as alternative specification
 - ✅ Exchange rate data: Added `原始数据/汇率.xlsx` (2007-2023 annual USD/RMB rates)
 - ✅ Baseline DID regression: Two-way fixed effects model completed
 - ✅ Final dataset: `总数据集_2007-2023_完整版_无缺失FDI.xlsx` (4,819 obs × 285 cities × 26 variables)
-- ✅ **Propensity Score Matching (PSM)**: Year-by-year matching with 5 covariates (caliper=0.02) - **2,830 obs matched**
-- ✅ **PSM-DID regression (Alternative specification)**: Double robust estimation using `industrial_advanced` - **2,830 obs**
+- ✅ **PSM-DID regression (Alternative specification with fdi_openness)**: Caliper=0.01, 5 covariates - **2,648 obs**
+  - Covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
+  - DID coefficient: 0.0336 (p=0.257, not significant)
+  - Control variables: ln_pgdp***, industrial_advanced***, ln_road_area** significant
+  - Balance test: All 5 covariates satisfy |bias| < 10% criterion
 - ✅ **PSM-DID regression (Tertiary share model)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
 - ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
 - ✅ **Secondary industry share model**: Robustness check with alternative specification
@@ -37,20 +40,30 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 ### Key Research Findings
 
-**1. PSM-DID Results (Tertiary Share Model - Main Specification)**
+**1. PSM-DID Results (Alternative Specification with fdi_openness - Caliper=0.01)**
+- DID coefficient: 0.0336 (p=0.257, not significant)
+- Sample: 2,648 obs × 199 cities × 17 years (stricter matching quality)
+- Covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
+- Control variables: ln_pgdp*** (-0.393), industrial_advanced*** (-0.083), ln_road_area** (0.111) significant
+  - ln_pop_density: -0.205 (p=0.226, not significant)
+  - fdi_openness: -1.097 (p=0.128, not significant)
+- Balance test: All covariates satisfy |bias| < 10% ✓
+- **Interpretation**: Consistent with main specification - policy effect not significant
+
+**2. PSM-DID Results (Tertiary Share Model - Main Specification)**
 - DID coefficient: 0.0427 (p=0.105, not significant at 10% level)
 - Sample: 2,990 obs × 200 cities × 17 years
 - Control variables: ln_pgdp***, tertiary_share**, tertiary_share_sq***, ln_road_area** significant
 - Parallel trends: ✓ PASSED (pre-period slope p=0.4082)
 - **Long-term effect (t≥+5)**: +5.96% increase in emissions (p=0.081*, marginally significant)
 
-**2. Secondary Industry Share Model (Robustness Check)**
+**3. Secondary Industry Share Model (Robustness Check)**
 - DID coefficient: 0.0332 (p=0.200, less significant than tertiary model)
 - Secondary share variables not significant (possible multicollinearity)
 - Parallel trends: ✓ PASSED (pre-period slope p=0.3097)
 - Long-term effect (t≥+5): +5.03% (p=0.142, not significant)
 
-**3. Policy Interpretation**
+**4. Policy Interpretation**
 - Short-term (0-2 years): No significant effect
 - Medium-term (3-4 years): Positive trend but not significant
 - **Long-term (≥5 years): Policy may INCREASE emissions by ~6% (p<0.1)**
@@ -111,6 +124,7 @@ git push
 - `总数据集_2007-2023_修正FDI.xlsx` - Previous version with corrected FDI calculation
 - `总数据集_2007-2023_最终回归版.xlsx` - Regression-ready version (3,672 obs × 216 cities)
 - `倾向得分匹配_匹配后数据集.xlsx` - PSM-matched sample (2,990 obs × 200 cities)
+- `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx` - PSM-matched sample with fdi_openness (2,648 obs × 199 cities, caliper=0.01)
 
 **Quality Checks:**
 - ✅ GDP deflator minimum: 0.8410 (>0.8, indicating consistent base year)

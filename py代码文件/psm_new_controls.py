@@ -26,7 +26,7 @@ class PropensityScoreMatcher:
     匹配策略:
     - 逐年Logit回归 (而非混合所有年份)
     - 1:1最近邻匹配 (有放回)
-    - 卡尺范围: 0.02 (倾向得分差异限制)
+    - 卡尺范围: 0.01 (倾向得分差异限制)
 
     新控制变量组合:
     - ln_pgdp: 人均GDP (对数)
@@ -495,7 +495,7 @@ def main():
         covariates=covariates,
         treatment_var='treat',
         year_var='year',
-        caliper=0.02,
+        caliper=0.01,
         random_state=42
     )
 
@@ -506,7 +506,7 @@ def main():
     matcher.check_balance()
 
     # 生成报告
-    output_prefix = '人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM_'
+    output_prefix = '人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_'
     matcher.generate_reports(output_prefix=output_prefix)
 
     print("\n" + "="*60)

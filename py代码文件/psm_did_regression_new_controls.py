@@ -3,14 +3,15 @@ PSM-DID基准回归分析 (新控制变量组合)
 基于倾向得分匹配后的样本进行双重差分回归
 采用双重稳健估计(Double Robust Estimation)
 
-新控制变量组合: 人均GDP + 人口集聚程度 + 产业高级化 + FDI + 人均道路面积
+新控制变量组合: 人均GDP + 人口集聚程度 + 产业高级化 + 外商投资水平 + 人均道路面积
 - ln_pgdp: 人均GDP (对数)
 - ln_pop_density: 人口密度 (对数)
 - industrial_advanced: 产业高级化 (三产/二产, 水平值)
-- ln_fdi: FDI (对数)
+- fdi_openness: 外商投资水平 (FDI/GDP, 水平值)
 - ln_road_area: 人均道路面积 (对数)
 
 Created: 2025-01-12
+Updated: 2025-01-12 (使用fdi_openness替代ln_fdi)
 """
 
 import pandas as pd
@@ -23,7 +24,7 @@ from scipy import stats
 print('[OK] === 第一步：加载PSM匹配后数据集 ===')
 
 print('[OK] 加载PSM匹配后数据集...')
-df = pd.read_excel('人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM_匹配后数据集.xlsx')
+df = pd.read_excel('人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx')
 print(f'[OK] 数据集加载成功: {df.shape[0]} 观测 × {df.shape[1]} 变量')
 
 # 设置面板标识
@@ -55,7 +56,7 @@ control_vars = [
     'ln_pgdp',             # 经济发展水平：人均GDP对数
     'ln_pop_density',      # 人口集聚程度：人口密度对数
     'industrial_advanced', # 产业高级化程度：三产/二产比值（水平值）
-    'ln_fdi',             # 外商直接投资对数
+    'fdi_openness',       # 外商投资水平：FDI/GDP（水平值）
     'ln_road_area'        # 基础设施水平：人均道路面积对数
 ]
 
@@ -282,7 +283,7 @@ model_stats = pd.DataFrame({
 results_df = pd.concat([results_df, model_stats], ignore_index=True)
 
 # 保存到Excel
-output_file = '人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM-DID基准回归结果表.xlsx'
+output_file = '人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM-DID基准回归结果表.xlsx'
 results_df.to_excel(output_file, index=False)
 print(f'[OK] 回归结果已保存: {output_file}')
 
@@ -318,4 +319,4 @@ for i, var in enumerate(control_vars):
 print('\n' + '='*80)
 print('[OK] PSM-DID regression completed!')
 print('='*80)
-print('\nOutput file: 人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM-DID基准回归结果表.xlsx')
+print('\nOutput file: 人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM-DID基准回归结果表.xlsx')
