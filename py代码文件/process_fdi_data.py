@@ -26,8 +26,8 @@ print(f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 文件路径
 FDI_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\原始数据\1996-2023年地级市外商直接投资FDI.xlsx")
-MAIN_DATA = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_含产业升级变量.xlsx")
-OUTPUT_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_修正FDI.xlsx")
+MAIN_DATA = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_修正FDI.xlsx")
+OUTPUT_FILE = Path(r"c:\Users\HP\Desktop\毕业论文\总数据集_2007-2023_完整版_无缺失FDI.xlsx")
 
 # ================================
 # 步骤1：读取FDI原始数据
@@ -140,10 +140,21 @@ print(f"  剩余城市数量: {df_fdi_clean['city_name'].nunique()}")
 df_fdi_clean = df_fdi_clean.sort_values(['city_name', 'year'])
 
 def interpolate_fdi(group):
-    """对单个城市的时间序列进行插值"""
+    """对单个城市的时间序列进行插值（包括端点）"""
     group = group.copy()
-    # 仅对中间缺失进行插值
-    group['fdi_interpolated'] = group['fdi'].interpolate(method='linear', limit_direction='both')
+
+    # 步骤1: 线性插值中间缺失值
+    group['fdi_interpolated'] = group['fdi'].interpolate(
+        method='linear',
+        limit_direction='both',
+        limit=None
+    )
+
+    # 步骤2: 如果端点仍有缺失，使用前向/后向填充
+    # 对于起始年份缺失，用后向填充
+    # 对于结束年份缺失，用前向填充
+    group['fdi_interpolated'] = group['fdi_interpolated'].fillna(method='bfill').fillna(method='ffill')
+
     return group
 
 df_fdi_clean = df_fdi_clean.groupby('city_name').apply(interpolate_fdi).reset_index(drop=True)
@@ -162,12 +173,15 @@ print(f"  插值填充数量: {interpolated_count}")
 df_fdi_clean['fdi'] = df_fdi_clean['fdi_interpolated']
 df_fdi_clean = df_fdi_clean.drop(columns=['fdi_interpolated'])
 
-# 如果仍有缺失值（端点缺失），考虑剔除
-final_missing = df_fdi_clean[df_fdi_clean['fdi'].isna()]['city_name'].unique()
-if len(final_missing) > 0:
-    print(f"\n[WARNING] 以下城市插值后仍有缺失值（端点缺失），将被剔除:")
-    print(final_missing)
-    df_fdi_clean = df_fdi_clean[~df_fdi_clean['city_name'].isin(final_missing)]
+# 检查是否仍有缺失值（应该为0，如果大于0说明整个城市都无数据）
+final_missing_count = df_fdi_clean['fdi'].isna().sum()
+final_missing_cities = df_fdi_clean[df_fdi_clean['fdi'].isna()]['city_name'].unique()
+
+if final_missing_count > 0:
+    print(f"\n[WARNING] 以下城市插值后仍有缺失值（完全无数据），将被剔除:")
+    print(f"  城市数量: {len(final_missing_cities)}")
+    print(f"  缺失观测数: {final_missing_count}")
+    df_fdi_clean = df_fdi_clean[~df_fdi_clean['city_name'].isin(final_missing_cities)]
 
 print(f"\n[OK] 最终FDI数据:")
 print(f"  数据维度: {df_fdi_clean.shape}")
@@ -340,7 +354,10 @@ print(f"   - 城市数量: {df_fdi['city_name'].nunique()}")
 
 print(f"\n2. 城市清洗:")
 print(f"   - 剔除严重缺失城市: {len(severe_missing_cities)}个")
-print(f"   - 剔除端点缺失城市: {len(final_missing) if len(final_missing) > 0 else 0}个")
+if 'final_missing_cities' in locals():
+    print(f"   - 剔除完全无数据城市: {len(final_missing_cities)}个")
+else:
+    print(f"   - 剔除完全无数据城市: 0个")
 print(f"   - 插值填充: {interpolated_count}个观测值")
 
 print(f"\n3. 最终数据:")
