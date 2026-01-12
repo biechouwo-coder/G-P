@@ -34,6 +34,9 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
   - Balance test: All 5 covariates satisfy |bias| < 10% criterion
 - ✅ **PSM-DID regression (Tertiary share model)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
 - ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
+- ✅ **Event Study (New controls with caliper=0.02)**: Parallel trends test for fdi_openness + industrial_advanced model - **PASSED** ✓
+  - Pre-period slope p=0.263, all pre-trend coefficients insignificant
+  - Long-term effect (t≥+5): +4.0% (p=0.262, not significant)
 - ✅ **Secondary industry share model**: Robustness check with alternative specification
 - ✅ **Data quality fixes**: Corrected Shanghai FDI data error (restored original values 2011-2023)
 - ✅ **Sanya FDI anomaly analysis**: Documented 86.5% drop in 2017, diagnostic tools created
@@ -48,7 +51,12 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
   - ln_pop_density: -0.251 (p=0.134, not significant)
   - fdi_openness: -0.961 (p=0.177, not significant)
 - Balance test: All covariates satisfy |bias| < 10% ✓
-- **Interpretation**: Consistent with main specification - policy effect not significant
+- **Parallel trends**: ✓ PASSED (pre-period slope p=0.263)
+- **Event Study Results**:
+  - All pre-period coefficients insignificant (t=-5 to -2, all p>0.1)
+  - Policy period (t=0 to t=4): All coefficients insignificant
+  - Long-term effect (t≥+5): +4.0% (p=0.262, not significant)
+- **Interpretation**: Consistent with main specification - policy effect not significant even with stricter matching
 
 **2. PSM-DID Results (Tertiary Share Model - Main Specification)**
 - DID coefficient: 0.0427 (p=0.105, not significant at 10% level)
