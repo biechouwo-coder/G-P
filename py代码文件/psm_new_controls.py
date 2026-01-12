@@ -1,6 +1,6 @@
 """
 倾向得分匹配 (Propensity Score Matching, PSM) 分析
-控制变量组合: 人均GDP + 人口集聚程度 + 产业高级化 + FDI + 人均道路面积
+控制变量组合: 人均GDP + 人口集聚程度 + 产业高级化 + 外商投资水平 + 人均道路面积
 
 功能:
 1. 逐年Logit回归估计倾向得分
@@ -32,7 +32,7 @@ class PropensityScoreMatcher:
     - ln_pgdp: 人均GDP (对数)
     - ln_pop_density: 人口密度 (对数)
     - industrial_advanced: 产业高级化 (三产/二产, 水平值)
-    - ln_fdi: FDI (对数)
+    - fdi_openness: 外商投资水平 (FDI/GDP, 水平值)
     - ln_road_area: 人均道路面积 (对数)
     """
 
@@ -472,7 +472,7 @@ def main():
 
     # 读取数据
     print("\n[OK] 读取数据...")
-    data = pd.read_excel('总数据集_2007-2023_最终回归版.xlsx')
+    data = pd.read_excel('总数据集_2007-2023_完整版_无缺失FDI.xlsx')
     print(f"[OK] 原始数据: {len(data)} 观测 × {len(data.columns)} 变量")
 
     # 定义协变量 (新的控制变量组合)
@@ -480,7 +480,7 @@ def main():
         'ln_pgdp',              # 人均GDP (对数)
         'ln_pop_density',       # 人口密度 (对数)
         'industrial_advanced',  # 产业高级化 (三产/二产, 水平值)
-        'ln_fdi',               # FDI (对数)
+        'fdi_openness',         # 外商投资水平 (FDI/GDP, 水平值)
         'ln_road_area'          # 人均道路面积 (对数)
     ]
 
