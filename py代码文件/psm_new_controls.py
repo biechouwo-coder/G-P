@@ -466,7 +466,7 @@ def main():
     print("  1. ln_pgdp - 人均GDP (对数)")
     print("  2. ln_pop_density - 人口密度 (对数)")
     print("  3. industrial_advanced - 产业高级化 (三产/二产, 水平值)")
-    print("  4. ln_fdi - FDI (对数)")
+    print("  4. fdi_openness - 外商投资水平 (FDI/GDP, 水平值)")
     print("  5. ln_road_area - 人均道路面积 (对数)")
     print("="*60)
 
