@@ -26,7 +26,9 @@
       "Bash(move *.py py代码文件)",
       "Bash(del:*)",
       "Bash(rm:*)",
-      "Bash(move:*)"
+      "Bash(move:*)",
+      "Bash(copy:*)",
+      "Bash(cmd /c \"dir /b | findstr 2012\")"
     ]
   }
 }
