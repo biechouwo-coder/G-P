@@ -26,7 +26,7 @@ class PropensityScoreMatcher:
     匹配策略:
     - 逐年Logit回归 (而非混合所有年份)
     - 1:1最近邻匹配 (有放回)
-    - 卡尺范围: 0.01 (倾向得分差异限制)
+    - 卡尺范围: 0.02 (倾向得分差异限制)
 
     新控制变量组合:
     - ln_pgdp: 人均GDP (对数)
@@ -495,7 +495,7 @@ def main():
         covariates=covariates,
         treatment_var='treat',
         year_var='year',
-        caliper=0.01,
+        caliper=0.02,
         random_state=42
     )
 

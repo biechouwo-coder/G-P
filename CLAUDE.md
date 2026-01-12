@@ -27,10 +27,10 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 - ✅ Exchange rate data: Added `原始数据/汇率.xlsx` (2007-2023 annual USD/RMB rates)
 - ✅ Baseline DID regression: Two-way fixed effects model completed
 - ✅ Final dataset: `总数据集_2007-2023_完整版_无缺失FDI.xlsx` (4,819 obs × 285 cities × 26 variables)
-- ✅ **PSM-DID regression (Alternative specification with fdi_openness)**: Caliper=0.01, 5 covariates - **2,648 obs**
+- ✅ **PSM-DID regression (Alternative specification with fdi_openness)**: Caliper=0.02, 5 covariates - **2,846 obs**
   - Covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
-  - DID coefficient: 0.0336 (p=0.257, not significant)
-  - Control variables: ln_pgdp***, industrial_advanced***, ln_road_area** significant
+  - DID coefficient: 0.0275 (p=0.329, not significant)
+  - Control variables: ln_pgdp***, industrial_advanced***, ln_road_area*** significant
   - Balance test: All 5 covariates satisfy |bias| < 10% criterion
 - ✅ **PSM-DID regression (Tertiary share model)**: Year-by-year matching with 6 covariates (caliper=0.05) - **2,990 obs matched**
 - ✅ **Parallel trends test (Event Study)**: Multi-period event study with [-5,+5] window - **PASSED** ✓
@@ -40,13 +40,13 @@ Undergraduate thesis studying the impact of China's low-carbon city pilot polici
 
 ### Key Research Findings
 
-**1. PSM-DID Results (Alternative Specification with fdi_openness - Caliper=0.01)**
-- DID coefficient: 0.0336 (p=0.257, not significant)
-- Sample: 2,648 obs × 199 cities × 17 years (stricter matching quality)
+**1. PSM-DID Results (Alternative Specification with fdi_openness - Caliper=0.02)**
+- DID coefficient: 0.0275 (p=0.329, not significant)
+- Sample: 2,846 obs × 199 cities × 17 years
 - Covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
-- Control variables: ln_pgdp*** (-0.393), industrial_advanced*** (-0.083), ln_road_area** (0.111) significant
-  - ln_pop_density: -0.205 (p=0.226, not significant)
-  - fdi_openness: -1.097 (p=0.128, not significant)
+- Control variables: ln_pgdp*** (-0.360), industrial_advanced*** (-0.084), ln_road_area*** (0.115) significant
+  - ln_pop_density: -0.251 (p=0.134, not significant)
+  - fdi_openness: -0.961 (p=0.177, not significant)
 - Balance test: All covariates satisfy |bias| < 10% ✓
 - **Interpretation**: Consistent with main specification - policy effect not significant
 
@@ -358,12 +358,13 @@ Traditional STIRPAT: `I = P × A × T`
     - `check_balance()` - Standardized bias calculations
     - `generate_reports()` - Excel outputs for diagnostics
 
-- `psm_new_controls.py` - **Alternative PSM specification with 5 covariates**
+- `psm_new_controls.py` - **Alternative PSM specification with 5 covariates (UPDATED: caliper=0.01)**
+  - Uses `fdi_openness` (FDI/GDP ratio, level value) instead of ln_fdi
   - Uses `industrial_advanced` (tertiary/secondary ratio) instead of tertiary_share + tertiary_share_sq
-  - Tighter caliper: 0.02 (stricter matching for higher quality)
-  - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
-  - Matched sample: 2,830 observations (198 cities)
-  - Outputs saved to: `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/` directory
+  - **Current caliper: 0.01** (stricter matching for higher quality, updated from 0.02)
+  - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
+  - Matched sample: 2,648 observations (199 cities, caliper=0.01)
+  - Outputs saved to: `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/` directory
   - All covariates satisfy balance criterion (|bias| < 10%)
 
 **PSM-DID Analysis:**
@@ -382,12 +383,13 @@ Traditional STIRPAT: `I = P × A × T`
   - Tests sensitivity to industry structure variable choice
   - Outputs: `PSM-DID回归结果表_二产占比.xlsx`
 
-- `psm_did_regression_new_controls.py` - **Alternative specification with industrial_advanced**
-  - Loads matched sample from `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM_匹配后数据集.xlsx`
-  - 5 control variables: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
-  - DID coefficient: 0.0346 (p=0.184, not significant)
+- `psm_did_regression_new_controls.py` - **Alternative specification with fdi_openness (UPDATED)**
+  - Loads matched sample from `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx`
+  - 5 control variables: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
+  - **Current results (caliper=0.01, 2,648 obs):** DID coefficient: 0.0336 (p=0.257, not significant)
+  - Control variables: ln_pgdp*** (-0.393), industrial_advanced*** (-0.083), ln_road_area** (0.111)
   - Results consistent with main specification - policy effect remains insignificant
-  - Outputs: `人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/PSM-DID基准回归结果表.xlsx`
+  - Outputs: `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM-DID基准回归结果表.xlsx`
 
 **Event Study (Parallel Trends Test):**
 - `event_study_parallel_trends.py` - **Multi-period event study for parallel trends verification**
@@ -508,19 +510,19 @@ py py代码文件/propensity_score_matching.py
 # - Year-by-year estimation (17 separate Logit regressions)
 # - Balance criterion: standardized bias < 10%
 
-# Run PSM analysis - Alternative specification (industrial_advanced)
+# Run PSM analysis - Alternative specification (industrial_advanced + fdi_openness)
 py py代码文件/psm_new_controls.py
 
-# Output files (saved to: 人均GDP+人口集聚程度+产业高级化+FDI+人均道路面积/):
-# - PSM_匹配后数据集.xlsx (2,830 obs)
+# Output files (saved to: 人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/):
+# - PSM_匹配后数据集.xlsx (2,648 obs, caliper=0.01)
 # - PSM_平衡性检验.xlsx
 # - PSM_年度统计.xlsx
 # - PSM_汇总报告.xlsx
 
 # Matching specifications (alternative):
-# - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, ln_fdi, ln_road_area
+# - 5 covariates: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, ln_road_area
 # - Method: 1:1 nearest neighbor matching with replacement
-# - Caliper: 0.02 (stricter matching for higher quality)
+# - Caliper: 0.01 (stricter matching for higher quality)
 # - Year-by-year estimation (17 separate Logit regressions)
 # - Balance criterion: standardized bias < 10%
 ```
@@ -942,6 +944,18 @@ This allows the same script to run on different model specifications without mod
 
 **Conclusion**: Results robust - policy effect remains insignificant across specifications.
 
+### Alternative Specification (FDI Openness + Industrial Advanced)
+- **DID coefficient**: 0.0336 (p=0.257, not significant)
+- **Sample**: 2,648 obs × 199 cities (caliper=0.01, stricter matching)
+- **Control variables**:
+  - ln_pgdp: -0.393*** (higher GDP → lower emissions, EKC confirmed)
+  - industrial_advanced: -0.083*** (higher tertiary/secondary ratio → lower emissions)
+  - ln_road_area: 0.111** (more roads → higher emissions, unexpected)
+  - ln_pop_density: -0.205 (p=0.226, not significant)
+  - fdi_openness: -1.097 (p=0.128, not significant)
+- **Balance test**: All 5 covariates satisfy |bias| < 10% ✓
+- **Interpretation**: Consistent with main specification - policy effect not significant
+
 ## Common Issues and Solutions
 
 ### Issue 1: PSM Caliper Logic Bug
@@ -1016,6 +1030,16 @@ group['fdi_interpolated'] = group['fdi_interpolated'].fillna(method='bfill').fil
 
 ## Git Commit History (Recent Key Revisions)
 
+- `8ed6ea1` - Complete PSM-DID analysis with fdi_openness (caliper=0.01) (Jan 12)
+  - Tighten caliper from 0.02 to 0.01 for stricter matching quality
+  - Matched sample: 2,648 obs × 199 cities (reduced from 2,846)
+  - DID coefficient: 0.0336 (p=0.257, not significant)
+  - All 5 covariates satisfy balance criterion (|bias| < 10%)
+  - Output directory: `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/`
+- `1b73665` - Correct PSM control variable documentation from ln_fdi to fdi_openness (Jan 12)
+  - Fixed main() function print statement to show correct variable name
+  - Changed 'ln_fdi - FDI (对数)' to 'fdi_openness - 外商投资水平 (FDI/GDP, 水平值)'
+  - Aligns documentation with actual code usage
 - `5cfd0c5` - Improve FDI interpolation to eliminate missing values (Jan 12)
   - Enhanced interpolate_fdi() with forward/backward fill for endpoints
   - All 483 missing FDI values successfully filled
