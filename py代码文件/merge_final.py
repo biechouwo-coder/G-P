@@ -18,8 +18,9 @@ print("\nGDP columns:", list(df_gdp.columns))
 print("\nCarbon columns:", list(df_carbon.columns))
 
 # 标准化：查找关键列（按位置）
-# 人口密度：年份[0], 城市[2], 代码[4], 密度[9]
-df_pop = df_pop.iloc[:, [0, 2, 4, 9]]
+# 人口密度：年份[0], 城市[2], 代码[4], 密度[8] (BUGFIX: 原来错误使用列9，已修正为列8)
+# 列结构: 0=年份, 1=省份, 2=地级市, 3=省份代码, 4=城市代码, 5=面积, 6=人口, 7=填值人口, 8=人口密度
+df_pop = df_pop.iloc[:, [0, 2, 4, 8]]
 df_pop.columns = ['year', 'city_name', 'city_code', 'pop_density']
 
 # GDP：省份[0], 城市[1], 年份[2], 实际GDP[5], 平减指数[6]
