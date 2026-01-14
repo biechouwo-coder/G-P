@@ -28,7 +28,8 @@
       "Bash(rm:*)",
       "Bash(move:*)",
       "Bash(copy:*)",
-      "Bash(cmd /c \"dir /b | findstr 2012\")"
+      "Bash(cmd /c \"dir /b | findstr 2012\")",
+      "Bash(iconv:*)"
     ]
   }
 }
