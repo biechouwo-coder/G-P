@@ -15,9 +15,11 @@ CFPS/*.docx
 CFPS/*Stata*/
 
 # Office文档缓存
+~$*.*
+*.tmp
 ~$*.doc*
 ~$*.ppt*
-*.tmp
+~$*.xls*
 
 # 系统文件
 .DS_Store
