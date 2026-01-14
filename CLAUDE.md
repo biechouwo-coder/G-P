@@ -31,7 +31,7 @@ py py代码文件/psm_did_regression_new_controls.py
 py py代码文件/event_study_psm_new_controls.py
 ```
 
-## Current Status (January 12, 2025)
+## Current Status (January 14, 2025)
 
 ### Analysis Completed
 - ✅ **PSM-DID (Alternative spec with fdi_openness, caliper=0.02)**: 2,846 obs × 199 cities
@@ -41,7 +41,15 @@ py py代码文件/event_study_psm_new_controls.py
   - DID coefficient: 0.0427 (p=0.105, not significant)
   - Parallel trends: ✓ PASSED
 - ✅ **Event Study**: Dynamic effects with [-5,+5] window
-- ✅ **Data quality**: Fixed Shanghai FDI error, documented Sanya anomaly and Ordos 2022 GDP issue
+- ✅ **Data quality**: Fixed Shanghai FDI error, pop_density bug (Jan 14, 2025), documented Sanya anomaly and Ordos 2022 GDP issue
+
+### ⚠️ Critical Data Fix Required (January 14, 2025)
+**pop_density bug fixed** - All analyses need to be rerun with corrected dataset:
+- **Issue**: merge_final.py extracted column 9 (empty) instead of column 8 (actual pop_density)
+- **Impact**: Shanghai and Dongguan had constant values (3880.018924) for multiple years
+- **Fixed**: Corrected dataset saved as `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
+- **Action required**: Rerun PSM-DID analysis with corrected data
+- **Documentation**: See `数据质量问题_pop_density异常值修复.md`
 
 ### Key Finding
 **Low-carbon pilot policies show no significant emission reduction effect.** Policy effect remains insignificant across all model specifications (caliper 0.01, 0.02, 0.05; different control variables).
@@ -50,13 +58,16 @@ py py代码文件/event_study_psm_new_controls.py
 
 ### Source Data (DO NOT MODIFY)
 - `原始数据/298个地级市人口密度1998-2024年无缺失.xlsx` - Core innovation data (298 cities × 27 years)
+  - **Column structure**: 0=年份, 1=省份, 2=地级市, 3=省份代码, 4=城市代码, 5=面积, 6=人口, 7=填值人口, **8=人口密度**, 9=Unnamed (empty)
+  - **⚠️ CRITICAL**: Always extract column 8 for pop_density, NOT column 9
 - `原始数据/296个地级市GDP相关数据（以2000年为基期）.xlsx` - GDP with deflator (use column 3 for nominal GDP)
 - `原始数据/地级市碳排放强度.xlsx` - Carbon emissions (contains 2022 GDP error for Ordos, verified not used in final dataset)
 - `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` - FDI data
 - `原始数据/汇率.xlsx` - USD/RMB annual rates (2007-2023)
 
 ### Final Datasets
-- `总数据集_2007-2023_完整版_无缺失FDI.xlsx` - **Primary dataset** (4,819 obs × 285 cities, 0% FDI missing)
+- `总数据集_2007-2023_完整版_无缺失FDI.xlsx` - **Primary dataset** (4,819 obs × 285 cities, 0% FDI missing) - **⚠️ HAS BUG**
+- `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx` - **CORRECTED dataset** (use this one!)
 - `倾向得分匹配_匹配后数据集.xlsx` - PSM-matched sample (2,990 obs, tertiary share model)
 - `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx` - PSM-matched sample (2,846 obs, fdi_openness model)
 
@@ -166,6 +177,8 @@ event_vars_for_regression = [var for var in event_dummies.columns if var != 'eve
 2. **Missing data rate must be < 5%** for any variable
 3. **Always use city_name + year as merge keys** (not city_code due to inconsistency)
 4. **Use nominal GDP directly from source file** (column 3 of GDP data), NOT calculated as real GDP × deflator
+5. **⚠️ CRITICAL**: For pop_density data, **always use column 8** (人口密度), NOT column 9 (empty/NaN)
+6. **Check for constant values**: If a variable has identical values across multiple years for a city, investigate - likely indicates data extraction error
 
 ### FDI Processing Rules
 - **Correct unit conversion**: Divide by 100, not 10000
@@ -224,7 +237,40 @@ Where:
 - **Analysis**: Statistical testing confirms value within normal IQR range
 - **Decision**: Keep as genuine data, not an error
 
+### pop_density Bug (Fixed January 14, 2025)
+- **Issue**: Shanghai and Dongguan had constant pop_density value (3880.018924) for multiple years
+- **Root cause**: `merge_final.py` extracted column 9 (empty) instead of column 8 (actual data)
+- **Impact**: 2 cities affected, ~34 observations corrupted
+- **Fixed**: Corrected in `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
+- **Source script fixed**: `py代码文件/merge_final.py` line 23 now correctly uses column 8
+- **Documentation**: See `数据质量问题_pop_density异常值修复.md`
+
 ## Common Workflows
+
+### Data Quality Validation (CRITICAL Before Any Analysis)
+
+Always run these checks after creating or merging datasets:
+
+```python
+# 1. Check for constant values within cities (sign of data extraction error)
+df.groupby('city_name')['pop_density'].std()
+# If any city has std=0, investigate!
+
+# 2. Verify column positions before extraction
+# For pop_density file: columns are 0=年份, 1=省份, 2=城市, 3=省份代码,
+# 4=城市代码, 5=面积, 6=人口, 7=填值人口, 8=人口密度, 9=Unnamed (empty)
+df_raw.iloc[:, 8]  # Correct column for pop_density
+
+# 3. Check major cities for anomalies
+shanghai = df[df['city_name'] == '上海市']
+dongguan = df[df['city_name'] == '东莞市']
+# Should have varying values, not constants
+
+# 4. Merge verification
+print(f"Unique cities: {df['city_name'].nunique()}")
+print(f"Year range: {df['year'].min()} - {df['year'].max()}")
+print(f"Missing by variable:\n{df.isnull().sum()}")
+```
 
 ### Adding New Variables
 1. Extract from raw data using **column positions** (not names) due to Chinese encoding
@@ -336,8 +382,16 @@ Low-carbon pilot policies show **no statistically significant effect** on carbon
 3. Parallel trends assumption satisfied
 4. No evidence of emission reduction from pilot policies
 
-## Next Steps (Not Yet Started)
+## Next Steps (Priority Order)
 
+### Immediate (Required)
+- [ ] **Rerun all PSM-DID analyses** with corrected pop_density dataset
+  - Use `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
+  - Scripts to run: psm_new_controls.py → psm_did_regression_new_controls.py → event_study_psm_new_controls.py
+  - Compare results with previous (bugged) analysis
+  - Update research findings if coefficients change significantly
+
+### Future Analysis
 - [ ] Mechanism testing (industrial structure as mediator, not control)
 - [ ] Heterogeneity analysis (by batch, region, city size)
 - [ ] Additional robustness tests (placebo, exclude concurrent policies)
