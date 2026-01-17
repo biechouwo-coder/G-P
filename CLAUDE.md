@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -31,7 +31,7 @@ py py代码文件/psm_did_regression_new_controls.py
 py py代码文件/event_study_psm_new_controls.py
 ```
 
-## Current Status (January 14, 2025)
+## Current Status (January 17, 2025)
 
 ### Analysis Completed
 - ✅ **PSM-DID (Alternative spec with fdi_openness, caliper=0.02)**: 2,846 obs × 199 cities
@@ -41,15 +41,27 @@ py py代码文件/event_study_psm_new_controls.py
   - DID coefficient: 0.0427 (p=0.105, not significant)
   - Parallel trends: ✓ PASSED
 - ✅ **Event Study**: Dynamic effects with [-5,+5] window
-- ✅ **Data quality**: Fixed Shanghai FDI error, pop_density bug (Jan 14, 2025), documented Sanya anomaly and Ordos 2022 GDP issue
+- ✅ **Data quality**: Fixed Shanghai FDI error, pop_density bug (Jan 14), documented Sanya anomaly and Ordos 2022 GDP issue
+- ✅ **CEADs alternative data processing** (January 17): 2,323 obs × 216 cities (2007-2019)
+  - Carbon intensity mean: 2.76 tons/10k yuan (correlation 0.7668 with original data)
+  - **Bug fixed**: City name cleaning issue (V1 → V2), recovered 52 obs, 4 cities
+  - Treatment group CEI 54.50% lower than control group
+  - **Use**: `使用CEADs数据/CEADs_最终数据集_2007-2019_V2.xlsx`
+  - **Documentation**: See `使用CEADs数据/README.md` and `使用CEADs数据/Bug报告_城市名称清洗问题.md`
 
-### ⚠️ Critical Data Fix Required (January 14, 2025)
-**pop_density bug fixed** - All analyses need to be rerun with corrected dataset:
-- **Issue**: merge_final.py extracted column 9 (empty) instead of column 8 (actual pop_density)
-- **Impact**: Shanghai and Dongguan had constant values (3880.018924) for multiple years
-- **Fixed**: Corrected dataset saved as `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
-- **Action required**: Rerun PSM-DID analysis with corrected data
-- **Documentation**: See `数据质量问题_pop_density异常值修复.md`
+### ⚠️ Critical Data Fixes Applied
+1. **pop_density bug (January 14, 2025)**:
+   - **Issue**: merge_final.py extracted column 9 (empty) instead of column 8 (actual pop_density)
+   - **Impact**: Shanghai and Dongguan had constant values (3880.018924) for multiple years
+   - **Fixed**: Corrected dataset saved as `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
+   - **Documentation**: See `数据质量问题_pop_density异常值修复.md`
+
+2. **CEADs city name cleaning bug (January 17, 2025)**:
+   - **Issue**: V1 version turned "吉林市", "北京市", "上海市" into empty match keys
+   - **Impact**: Lost 52 observations, 4 cities (Jilin City, Beijing, Shanghai)
+   - **Fixed**: V2 version adds safety check: `if remaining and len(remaining) > 0: city_str = remaining`
+   - **Use**: `使用CEADs数据/CEADs_最终数据集_2007-2019_V2.xlsx` (NOT V1)
+   - **Documentation**: See `使用CEADs数据/Bug报告_城市名称清洗问题.md`
 
 ### Key Finding
 **Low-carbon pilot policies show no significant emission reduction effect.** Policy effect remains insignificant across all model specifications (caliper 0.01, 0.02, 0.05; different control variables).
@@ -64,10 +76,12 @@ py py代码文件/event_study_psm_new_controls.py
 - `原始数据/地级市碳排放强度.xlsx` - Carbon emissions (contains 2022 GDP error for Ordos, verified not used in final dataset)
 - `原始数据/1996-2023年地级市外商直接投资FDI.xlsx` - FDI data
 - `原始数据/汇率.xlsx` - USD/RMB annual rates (2007-2023)
+- `使用CEADs数据/1997-2019年290个中国城市碳排放清单 (1).xlsx` - CEADs emission data (290 cities, 1997-2019)
 
 ### Final Datasets
-- `总数据集_2007-2023_完整版_无缺失FDI.xlsx` - **Primary dataset** (4,819 obs × 285 cities, 0% FDI missing) - **⚠️ HAS BUG**
-- `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx` - **CORRECTED dataset** (use this one!)
+- `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density_添加金融发展水平.xlsx` - **Primary corrected dataset** (use this!)
+- `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx` - **CORRECTED dataset** (with pop_density fix)
+- `使用CEADs数据/CEADs_最终数据集_2007-2019_V2.xlsx` - **CEADs alternative dataset** (2,323 obs, 216 cities, 2007-2019)
 - `倾向得分匹配_匹配后数据集.xlsx` - PSM-matched sample (2,990 obs, tertiary share model)
 - `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx` - PSM-matched sample (2,846 obs, fdi_openness model)
 
@@ -170,6 +184,52 @@ def bin_relative_year(rel_year, treat_status):
 event_vars_for_regression = [var for var in event_dummies.columns if var != 'event_-1']
 ```
 
+### Pattern 5: CEADs City Name Matching (CRITICAL)
+
+**When matching CEADs data with Chinese city names, always use this safe pattern**:
+
+```python
+def create_match_key_from_ceads(city_name):
+    """
+    Extract match key from CEADs city names (removes province prefix and suffix)
+    Example: "四川成都" → "成都", "北京市" → "北京" (NOT empty string)
+    """
+    if pd.isna(city_name):
+        return np.nan
+
+    city_str = str(city_name).strip()
+
+    # Remove suffixes (市, 盟, 地区, 特区, 自治州, etc.)
+    suffixes = ['市', '盟', '地区', '特区',
+                '哈萨克自治州', '蒙古自治州', '藏族自治州', ...]
+    for suffix in sorted(suffixes, key=len, reverse=True):
+        if city_str.endswith(suffix):
+            city_str = city_str[:-len(suffix)]
+            break
+
+    # Remove province prefix (BUT with safety check to prevent empty strings)
+    provinces = ['北京', '天津', '上海', '重庆', ..., '吉林', ..., '海南', ...]
+    for province in sorted(provinces, key=len, reverse=True):
+        if city_str.startswith(province):
+            remaining = city_str[len(province):]
+            # ⚠️ CRITICAL: Only remove if remaining string is non-empty
+            if remaining and len(remaining) > 0:
+                city_str = remaining
+                break
+
+    return city_str
+```
+
+**Why this matters**: Without the safety check, cities like "吉林市" become:
+1. "吉林市" → "吉林" (remove suffix)
+2. "吉林" → "" (remove province prefix) ❌ **Empty string!**
+3. Result: Cannot match with main dataset
+
+With safety check:
+1. "吉林市" → "吉林" (remove suffix)
+2. "吉林" → "吉林" (prefix removal skipped because remaining is empty) ✅
+3. Result: Successfully matches with main dataset
+
 ## Important Constraints
 
 ### Data Quality Rules
@@ -179,6 +239,7 @@ event_vars_for_regression = [var for var in event_dummies.columns if var != 'eve
 4. **Use nominal GDP directly from source file** (column 3 of GDP data), NOT calculated as real GDP × deflator
 5. **⚠️ CRITICAL**: For pop_density data, **always use column 8** (人口密度), NOT column 9 (empty/NaN)
 6. **Check for constant values**: If a variable has identical values across multiple years for a city, investigate - likely indicates data extraction error
+7. **⚠️ CRITICAL for CEADs matching**: Always check for empty match keys after city name cleaning
 
 ### FDI Processing Rules
 - **Correct unit conversion**: Divide by 100, not 10000
@@ -245,6 +306,14 @@ Where:
 - **Source script fixed**: `py代码文件/merge_final.py` line 23 now correctly uses column 8
 - **Documentation**: See `数据质量问题_pop_density异常值修复.md`
 
+### CEADs City Name Cleaning Bug (Fixed January 17, 2025)
+- **Issue**: V1 version turned "吉林市", "北京市", "上海市" into empty match keys
+- **Root cause**: Unconditional removal of province prefix without checking if result is empty
+- **Impact**: Lost 52 observations, 4 cities (Jilin City 11 obs, Beijing 13 obs, Shanghai 13 obs)
+- **Fixed**: V2 version adds safety check `if remaining and len(remaining) > 0`
+- **Use**: `使用CEADs数据/CEADs_最终数据集_2007-2019_V2.xlsx` (NOT V1)
+- **Documentation**: See `使用CEADs数据/Bug报告_城市名称清洗问题.md`
+
 ## Common Workflows
 
 ### Data Quality Validation (CRITICAL Before Any Analysis)
@@ -270,6 +339,13 @@ dongguan = df[df['city_name'] == '东莞市']
 print(f"Unique cities: {df['city_name'].nunique()}")
 print(f"Year range: {df['year'].min()} - {df['year'].max()}")
 print(f"Missing by variable:\n{df.isnull().sum()}")
+
+# 5. Check for empty match keys (when using CEADs data or city name matching)
+if 'match_key' in df.columns:
+    empty_keys = df[df['match_key'] == '']
+    if len(empty_keys) > 0:
+        print(f"[WARNING] {len(empty_keys)} empty match keys found!")
+        print(empty_keys['city_name'].unique())
 ```
 
 ### Adding New Variables
@@ -293,6 +369,27 @@ py py代码文件/psm_did_regression_new_controls.py
 py py代码文件/event_study_psm_new_controls.py
 # Output: EventStudy_平行趋势检验结果.xlsx + .png
 ```
+
+### Processing CEADs Data
+```bash
+cd 使用CEADs数据
+
+# Step 1: Clean CEADs and GDP data (V2 - fixed version)
+py step2c_clean_ceads_fixed_v2.py
+
+# Step 2: Merge datasets
+py step3c_merge_data_fixed_v2.py
+
+# Step 3: Calculate carbon intensity
+py step4b_calculate_carbon_intensity_v2.py
+
+# Step 4: Generate descriptive statistics
+py step5b_descriptive_statistics_v2.py
+```
+
+**Output**: `CEADs_最终数据集_2007-2019_V2.xlsx` (2,323 obs, 216 cities, 2007-2019)
+
+**⚠️ IMPORTANT**: Always use V2 versions, NOT V1 (which has the city name cleaning bug)
 
 ### Modifying PSM Caliper
 Edit `py代码文件/psm_new_controls.py`:
@@ -337,10 +434,11 @@ Raw data → merge scripts → cleaning scripts → variable construction
 ```
 
 **Critical dependencies:**
-- All regression scripts require `总数据集_2007-2023_完整版_无缺失FDI.xlsx`
+- All regression scripts require `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
 - PSM scripts require final regression dataset (covariates already log-transformed)
 - PSM-DID regression scripts require matched PSM output
 - Event study script auto-detects data source (tries secondary, falls back to tertiary)
+- CEADs processing uses CEADs raw data + GDP data + main dataset (2007-2019 subset)
 
 ## Package Dependencies
 
@@ -376,11 +474,18 @@ Low-carbon pilot policies show **no statistically significant effect** on carbon
 - Parallel trends: ✓ PASSED (p=0.408)
 - Long-term effect (t≥+5): +5.96% (p=0.081*, marginally significant)
 
+**CEADs Alternative Data (2007-2019, V2 corrected):**
+- Sample: 2,323 obs × 216 cities
+- Treatment group CEI: 54.50% lower than control group (p<0.001)
+- Correlation with original data: 0.7668
+- Supports robustness of main findings
+
 ### Consistent Findings Across Specifications
-1. Policy effect remains insignificant
+1. Policy effect remains insignificant in primary analysis
 2. Control variables behave as expected (ln_pgdp*** negative, industrial_advanced*** negative)
 3. Parallel trends assumption satisfied
 4. No evidence of emission reduction from pilot policies
+5. Treatment cities have lower baseline CEI (selection effect)
 
 ## Next Steps (Priority Order)
 
@@ -394,5 +499,6 @@ Low-carbon pilot policies show **no statistically significant effect** on carbon
 ### Future Analysis
 - [ ] Mechanism testing (industrial structure as mediator, not control)
 - [ ] Heterogeneity analysis (by batch, region, city size)
-- [ ] Additional robustness tests (placebo, exclude concurrent policies)
+- [ ] Additional robustness tests with CEADs data (V2 corrected)
+- [ ] Placebo tests and exclude concurrent policies
 - [ ] Synthetic control method as alternative identification strategy
