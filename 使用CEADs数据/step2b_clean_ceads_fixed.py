@@ -65,7 +65,12 @@ def create_match_key_from_ceads(city_name):
 
     for province in sorted(provinces, key=len, reverse=True):
         if city_str.startswith(province):
-            city_str = city_str[len(province):]
+            remaining = city_str[len(province):]
+            # 安全检查:只有当剩余字符串非空时才去除省份前缀
+            # 这防止了"吉林市"->"吉林"->""(空字符串)的问题
+            if remaining and len(remaining) > 0:
+                city_str = remaining
+            # 否则保留原字符串(如"吉林"保留为"吉林",不是空字符串)
             break
 
     return city_str

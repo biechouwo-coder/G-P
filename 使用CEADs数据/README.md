@@ -27,7 +27,8 @@
 - 内容：查看CEADs Excel文件结构，确定数据所在的工作表
 
 ### Step 2: 数据清洗
-- 文件：`step2c_clean_ceads_fixed_v2.py`（V2修正版）
+- **推荐文件**：`step2c_clean_ceads_fixed_v2.py`（V2修正版，完整流程）
+- 旧文件：`step2b_clean_ceads_fixed.py`（已修复Bug，但仅输出清洗后数据）
 - 内容：
   - 提取CEADs核心数据（城市、年份、排放量）
   - 时间截断：保留2007-2019年
@@ -36,7 +37,11 @@
 
 **关键修正**：
 1. CEADs城市名包含省份前缀（如"四川成都"），需要去除前缀后才能与主数据集匹配
-2. **Bug修复**：V1版本会将"吉林市"、"北京市"、"上海市"变成空字符串，V2版本修复此问题
+2. **Bug修复（2025-01-17）**：
+   - **问题**：V1版本会将"吉林市"、"北京市"、"上海市"变成空字符串
+   - **修复**：step2b_clean_ceads_fixed.py 和 step2c_clean_ceads_fixed_v2.py 均已修复
+   - **修复逻辑**：在去除省份前缀时添加安全检查 `if remaining and len(remaining) > 0`
+   - **效果**：V2版本新增52个观测、4个城市（吉林市11观测、北京市13观测、上海市13观测）
 
 ### Step 3: 数据合并
 - 文件：`step3c_merge_data_fixed_v2.py`（V2修正版）
