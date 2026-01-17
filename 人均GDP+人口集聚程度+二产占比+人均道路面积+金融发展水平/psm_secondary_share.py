@@ -495,7 +495,7 @@ def main():
         covariates=covariates,
         treatment_var='treat',
         year_var='year',
-        caliper=0.05,
+        caliper=0.02,
         random_state=42
     )
 
