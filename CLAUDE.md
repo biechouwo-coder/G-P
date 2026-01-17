@@ -82,6 +82,7 @@ py py代码文件/event_study_psm_new_controls.py
 - `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density_添加金融发展水平.xlsx` - **Primary corrected dataset** (use this!)
 - `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx` - **CORRECTED dataset** (with pop_density fix)
 - `使用CEADs数据/CEADs_最终数据集_2007-2019_V2.xlsx` - **CEADs alternative dataset** (2,323 obs, 216 cities, 2007-2019)
+- `使用CEADs数据/CEADs_PSM_匹配后数据集_五个控制变量_插值版.xlsx` - **CEADs PSM-matched sample** (1,152 obs, 144 cities)
 - `倾向得分匹配_匹配后数据集.xlsx` - PSM-matched sample (2,990 obs, tertiary share model)
 - `人均GDP+人口集聚程度+产业高级化+外商投资水平+人均道路面积/PSM_匹配后数据集.xlsx` - PSM-matched sample (2,846 obs, fdi_openness model)
 
@@ -391,6 +392,30 @@ py step5b_descriptive_statistics_v2.py
 
 **⚠️ IMPORTANT**: Always use V2 versions, NOT V1 (which has the city name cleaning bug)
 
+### Running CEADs PSM Analysis
+```bash
+cd 使用CEADs数据
+
+# Run PSM with 5 control variables (missing values imputed)
+py psm_ceads_five_controls_imputed.py
+
+# Output: CEADs_PSM_匹配后数据集_五个控制变量_插值版.xlsx (1,152 obs)
+# Balance test: CEADs_PSM_平衡性检验结果_五个控制变量_插值版.xlsx
+# Report: CEADs_PSM分析报告_五个控制变量.md
+```
+
+**CEADs PSM results**:
+- Matched pairs: 576 (75.0% match rate)
+- Final sample: 1,152 observations (576 treat + 576 control)
+- Cities: 144 (65 treatment + 79 control)
+- Balance: 4/5 variables pass, propensity scores p=0.969
+
+**Sample Selection Bias Analysis** (January 17):
+- CEADs coverage biased toward developed cities (+24% GDP per capita, p<0.01)
+- Treatment group match rate: 71.7%, Control group: 75.6% (balanced impact)
+- Analysis: `使用CEADs数据/样本选择偏差与GDP基期分析_完整报告.md`
+- GDP base year: Consistent across datasets (year 2000) ✅
+
 ### Modifying PSM Caliper
 Edit `py代码文件/psm_new_controls.py`:
 - Line 29: Update docstring `卡尺范围: X.XX`
@@ -478,6 +503,11 @@ Low-carbon pilot policies show **no statistically significant effect** on carbon
 - Sample: 2,323 obs × 216 cities
 - Treatment group CEI: 54.50% lower than control group (p<0.001)
 - Correlation with original data: 0.7668
+- **CEADs PSM completed** (January 17): 1,152 obs × 144 cities (75.0% match rate)
+  - Control variables: ln_pgdp, ln_pop_density, industrial_advanced, fdi_openness, financial_development
+  - Balance: 4/5 variables pass (fdi_openness unbalanced as expected)
+  - Propensity scores: p=0.969 (no significant difference)
+  - Use: `使用CEADs数据/CEADs_PSM_匹配后数据集_五个控制变量_插值版.xlsx`
 - Supports robustness of main findings
 
 ### Consistent Findings Across Specifications
@@ -489,16 +519,22 @@ Low-carbon pilot policies show **no statistically significant effect** on carbon
 
 ## Next Steps (Priority Order)
 
-### Immediate (Required)
-- [ ] **Rerun all PSM-DID analyses** with corrected pop_density dataset
-  - Use `总数据集_2007-2023_完整版_无缺失FDI_修正pop_density.xlsx`
-  - Scripts to run: psm_new_controls.py → psm_did_regression_new_controls.py → event_study_psm_new_controls.py
-  - Compare results with previous (bugged) analysis
-  - Update research findings if coefficients change significantly
+### Immediate (Recommended)
+- [x] **CEADs data processing** (COMPLETED January 17)
+  - V2 version fixes city name cleaning bug
+  - Sample selection bias analysis completed
+  - PSM matching completed (1,152 obs × 144 cities)
+- [ ] **CEADs PSM-DID regression**
+  - Use `使用CEADs数据/CEADs_PSM_匹配后数据集_五个控制变量_插值版.xlsx`
+  - Run DID regression with CEADs carbon intensity as dependent variable
+  - Compare with main dataset results for robustness
+- [ ] **CEADs Event Study**
+  - Parallel trends test using CEADs matched sample
+  - Dynamic policy effects with [-5,+5] window
 
 ### Future Analysis
 - [ ] Mechanism testing (industrial structure as mediator, not control)
 - [ ] Heterogeneity analysis (by batch, region, city size)
-- [ ] Additional robustness tests with CEADs data (V2 corrected)
 - [ ] Placebo tests and exclude concurrent policies
 - [ ] Synthetic control method as alternative identification strategy
+- [ ] Additional robustness checks (different calipers, covariate combinations)
